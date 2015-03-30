@@ -1,0 +1,9 @@
+- stat: path=/usr/local/bin/rustc
+  register: rust
+
+- include: rust.yml
+  when: rust.stat.exists == False
+
+- include: fpm.yml
+
+- apt: name=libssl-dev state=present

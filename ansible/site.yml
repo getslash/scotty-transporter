@@ -1,0 +1,4 @@
+---
+- hosts: transporters
+  roles:
+    - transporter

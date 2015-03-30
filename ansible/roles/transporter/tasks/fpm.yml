@@ -1,0 +1,9 @@
+- name: install required gem dependencies
+  apt: name={{item}} state=present
+  with_items:
+    - gem
+    - ruby-dev
+    - gcc
+
+- name: install FPM
+  shell: gem install fpm

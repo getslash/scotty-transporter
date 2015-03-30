@@ -1,0 +1,23 @@
+[package]
+
+name = "transporter"
+version = "0.0.1"
+authors = ["Roey Darwish Dror <roeyd@infinidat.com>"]
+
+[dependencies]
+byteorder = "*"
+
+[dependencies.env_logger]
+git = "https://github.com/rust-lang/log"
+
+[dependencies.log]
+git = "https://github.com/rust-lang/log"
+
+[dependencies.rustc-serialize]
+git = "https://github.com/rust-lang/rustc-serialize.git"
+
+[dependencies.url]
+git = "https://github.com/servo/rust-url"
+
+[dependencies.hyper]
+git = "https://github.com/hyperium/hyper.git"
