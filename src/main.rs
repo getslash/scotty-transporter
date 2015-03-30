@@ -4,6 +4,7 @@ use storage::FileStorage;
 use config::Config;
 use std::env::args;
 use std::path::Path;
+use docopt::Docopt;
 
 mod beam;
 mod storage;
@@ -12,13 +13,17 @@ mod server;
 mod error;
 mod scotty;
 
+static USAGE: &'static str = "
+Usage: transporter <config>
+";
+
 extern crate rustc_serialize;
 extern crate hyper;
+extern crate docopt;
 extern crate byteorder;
 extern crate url;
 #[macro_use]extern crate log;
 extern crate env_logger;
-
 type BeamId = usize;
 
 fn run(config: &Config) {
@@ -36,19 +41,13 @@ fn run(config: &Config) {
 
 fn main() {
     env_logger::init().unwrap();
+    let args = Docopt::new(USAGE)
+        .and_then(|d| d.parse())
+        .unwrap_or_else(|e| e.exit());
 
-    let args: Vec<String> = args().collect();
-    match args {
-        [_, ref config_path] => {
-            let config = match Config::load(&Path::new(config_path)) {
-                Ok(c) => c,
-                Err(why) => panic!("Cannot load configuration: {}", why)
-            };
-            run(&config);
-        },
-        _ => {
-            println!("Usage: transporter [config file]");
-            return;
-        }
-    }
+    let config = match Config::load(&Path::new(&args.get_str("<config>"))) {
+        Ok(c) => c,
+        Err(why) => panic!("Cannot load configuration: {}", why)
+    };
+    run(&config);
 }
