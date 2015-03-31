@@ -1,9 +1,3 @@
-use storage::FileStorage;
-use config::Config;
-use std::env::args;
-use std::path::Path;
-use docopt::Docopt;
-
 mod beam;
 mod storage;
 mod config;
@@ -11,17 +5,24 @@ mod server;
 mod error;
 mod scotty;
 
-static USAGE: &'static str = "
-Usage: transporter <config>
-";
-
 extern crate rustc_serialize;
 extern crate hyper;
 extern crate docopt;
 extern crate byteorder;
 extern crate url;
-#[macro_use]extern crate log;
+#[macro_use] extern crate log;
 extern crate env_logger;
+
+use storage::FileStorage;
+use config::Config;
+use std::env::args;
+use std::path::Path;
+use docopt::Docopt;
+
+static USAGE: &'static str = "
+Usage: transporter <config>
+";
+
 type BeamId = usize;
 
 fn run(config: &Config) {
