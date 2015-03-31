@@ -1,5 +1,3 @@
-#![feature(core, slice_patterns)]
-
 use storage::FileStorage;
 use config::Config;
 use std::env::args;

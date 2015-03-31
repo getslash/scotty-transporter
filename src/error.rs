@@ -63,7 +63,6 @@ impl fmt::Display for TransporterError {
     }
 }
 
-#[allow(dead_code)]
 pub fn error(s: String) -> TransporterError {
     TransporterError::Message(s)
 }

@@ -1,9 +1,8 @@
 use std::net::TcpStream;
 use std::io::{Read, Write};
-use std::num::FromPrimitive;
 use std::cmp::min;
 use super::storage::FileStorage;
-use super::error::{TransporterResult, TransporterError};
+use super::error::{TransporterResult, TransporterError, error};
 use super::scotty::Scotty;
 use super::config::Config;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -11,10 +10,19 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 const CHUNK_SIZE: usize = 4096usize;
 
-#[derive(FromPrimitive)]
 enum ClientMessages {
-    BeamComplete = 0,
-    StartBeamingFile = 1,
+    BeamComplete,
+    StartBeamingFile,
+}
+
+impl ClientMessages {
+    fn from_u8(code: u8) -> TransporterResult<ClientMessages> {
+        match code {
+            0 => Ok(ClientMessages::BeamComplete),
+            1 => Ok(ClientMessages::StartBeamingFile),
+            _ => Err(error(format!("Invalid message code {}", code))),
+        }
+    }
 }
 
 enum ServerMessages {
@@ -83,15 +91,10 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty) -> TransporterResult<()>
 {
     loop {
-        let message_code = try!(stream.read_u8());
-        match FromPrimitive::from_u8(message_code) {
-            Some(message) => {
-                match message {
-                    ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty)),
-                    ClientMessages::BeamComplete => return Ok(()),
-                }
-            }
-            _ => return Err(TransporterError::Message(format!("Received unknown message code {}", message_code)))
+        let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8())));
+        match message_code {
+            ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty)),
+            ClientMessages::BeamComplete => return Ok(()),
         }
     }
 }
