@@ -55,27 +55,22 @@ impl<'v> Scotty<'v> {
     }
 
     pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str, file_size: usize) -> TransporterResult<(String, bool)> {
-        let url = format!("{}/api/rest/files", self.url);
+        let url = format!("{}/files", self.url);
         let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id, file_size: file_size };
-        debug!("Encoding params");
         let encoded_params = try!(json::encode::<FilePostRequest>(&params));
-        debug!("Sending request to {} {}", url, encoded_params);
         let request = self.client.post(&url[..])
             .body(&encoded_params[..])
             .header(ContentType(self.json_mime.clone()));
-        let mut response = request.send().unwrap();
-        debug!("checking response");
+        let mut response = try!(request.send());
         check_response!(response, url);
         let mut content = String::new();
-        debug!("reading response");
         try!(response.read_to_string(&mut content));
-        debug!("decoding response");
         let result = try!(json::decode::<FilePostResponse>(&content));
         Ok((result.file_id, result.should_beam))
     }
 
     pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>) -> TransporterResult<()> {
-        let url = format!("{}/api/rest/file/{}", self.url, file_id);
+        let url = format!("{}/files/{}", self.url, file_id);
         let error_string = match err {
             Some(err) => err.description(),
             _ => ""
@@ -91,7 +86,7 @@ impl<'v> Scotty<'v> {
     }
 
     pub fn complete_beam(&mut self, beam_id: BeamId) -> TransporterResult<()> {
-        let url = format!("{}/api/rest/beam/{}", self.url, beam_id);
+        let url = format!("{}/beams/{}", self.url, beam_id);
         let params = BeamUpdateRequest { completed: true };
         let encoded_params = try!(json::encode::<BeamUpdateRequest>(&params));
         let response = try!(self.client.put(&url[..])
