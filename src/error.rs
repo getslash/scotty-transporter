@@ -1,4 +1,5 @@
-use std::error::{Error, FromError};
+use std::error::Error;
+use std::convert::From;
 use byteorder::Error as ByteError;
 use std::string::String;
 use rustc_serialize::json;
@@ -15,8 +16,8 @@ pub enum TransporterError {
 
 macro_rules! from_error(
     ($err:ty) => {
-        impl FromError<$err> for TransporterError {
-            fn from_error(err: $err) -> Self {
+        impl From<$err> for TransporterError {
+            fn from(err: $err) -> Self {
                 TransporterError::Chain(Box::new(err))
             }
         }
@@ -29,8 +30,8 @@ from_error!(json::EncoderError);
 from_error!(FromUtf8Error);
 from_error!(io::Error);
 
-impl FromError<HttpError> for TransporterError {
-    fn from_error(err: HttpError) -> Self {
+impl From<HttpError> for TransporterError {
+    fn from(err: HttpError) -> Self {
         match err {
             HttpError::HttpIoError(err) => TransporterError::Chain(Box::new(err)),
             _ => TransporterError::Chain(Box::new(err))
