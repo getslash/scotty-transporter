@@ -11,6 +11,7 @@ pub struct Config {
     pub storage_path: String,
     pub bind_address: String,
     pub scotty_url: String,
+    pub sentry_dsn: String,
 }
 
 #[derive(Debug)]

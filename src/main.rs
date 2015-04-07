@@ -10,6 +10,7 @@ extern crate hyper;
 extern crate docopt;
 extern crate byteorder;
 extern crate url;
+extern crate raven;
 #[macro_use] extern crate log;
 extern crate env_logger;
 
@@ -32,7 +33,9 @@ fn run(config: &Config) {
         Err(why) => panic!("Cannot open storage: {}", why)
     };
 
-    match server::listen(config, &storage) {
+    let raven = raven::Client::from_string(&config.sentry_dsn).unwrap();
+
+    match server::listen(config, &storage, &raven) {
         Err(why) => panic!("Server crashed: {}", why),
         _ => ()
     }
