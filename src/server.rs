@@ -20,7 +20,7 @@ pub fn listen(config: &Config, storage: &FileStorage) -> Result<()> {
                 let config = config.clone();
                 thread::spawn(move || {
                     match beam_up(&mut stream, &storage, &config) {
-                        Err(why) => { error!("Connection closed: {}", why); },
+                        Err(why) => { error!("Connection closed: {:?}", why); },
                         Ok(_) => (),
                     };
                 });

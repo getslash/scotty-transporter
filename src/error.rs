@@ -1,71 +1,49 @@
 use std::error::Error;
 use std::convert::From;
 use byteorder::Error as ByteError;
-use std::string::String;
-use rustc_serialize::json;
 use std::fmt;
-use std::string::FromUtf8Error;
-use std::io;
-use hyper::HttpError;
+use std::io::Error as IoError;
+use super::scotty::ScottyError;
 
 #[derive(Debug)]
 pub enum TransporterError {
-    Chain(Box<Error + 'static>),
-    Message(String)
+    InvalidClientMessageCode(u8),
+    ByteError(ByteError),
+    IoError(IoError),
+    ScottyError(ScottyError),
 }
 
-macro_rules! from_error(
-    ($err:ty) => {
-        impl From<$err> for TransporterError {
-            fn from(err: $err) -> Self {
-                TransporterError::Chain(Box::new(err))
-            }
-        }
-    }
-);
+impl From<ByteError> for TransporterError {
+    fn from(err: ByteError) -> TransporterError { TransporterError::ByteError(err) }
+}
 
-from_error!(ByteError);
-from_error!(json::DecoderError);
-from_error!(json::EncoderError);
-from_error!(FromUtf8Error);
-from_error!(io::Error);
+impl From<IoError> for TransporterError {
+    fn from(err: IoError) -> TransporterError { TransporterError::IoError(err) }
+}
 
-impl From<HttpError> for TransporterError {
-    fn from(err: HttpError) -> Self {
-        match err {
-            HttpError::HttpIoError(err) => TransporterError::Chain(Box::new(err)),
-            _ => TransporterError::Chain(Box::new(err))
-        }
-    }
+impl From<ScottyError> for TransporterError {
+    fn from(err: ScottyError) -> TransporterError { TransporterError::ScottyError(err) }
 }
 
 impl Error for TransporterError {
     fn description(&self) -> &str {
-        match *self {
-            TransporterError::Chain(ref err) => err.description(),
-            TransporterError::Message(ref s) => s,
-        }
+        return "";
     }
 
     fn cause(&self) -> Option<&Error> {
-        match *self {
-            TransporterError::Chain(ref err) => Some(&**err),
-            _ => None,
-        }
+        None
     }
 }
 
 impl fmt::Display for TransporterError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            TransporterError::Chain(ref err) => err.fmt(formatter),
-            TransporterError::Message(ref s) => s.fmt(formatter)
+            TransporterError::InvalidClientMessageCode(code) => formatter.write_fmt(format_args!("Invalid message code: {}", code)),
+            TransporterError::ByteError(ref error) => formatter.write_fmt(format_args!("Byte error: {}", error)),
+            TransporterError::IoError(ref error) => formatter.write_fmt(format_args!("IO error: {}", error)),
+            TransporterError::ScottyError(ref error) => formatter.write_fmt(format_args!("Scotty error: {}", error)),
         }
     }
-}
-
-pub fn error(s: String) -> TransporterError {
-    TransporterError::Message(s)
 }
 
 pub type TransporterResult<T> = Result<T, TransporterError>;

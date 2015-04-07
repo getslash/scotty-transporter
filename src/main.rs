@@ -46,7 +46,7 @@ fn main() {
 
     let config = match Config::load(&Path::new(&args.get_str("<config>"))) {
         Ok(c) => c,
-        Err(why) => panic!("Cannot load configuration: {}", why)
+        Err(why) => panic!("Cannot load configuration: {:?}", why)
     };
     run(&config);
 }

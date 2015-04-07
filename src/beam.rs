@@ -2,7 +2,7 @@ use std::net::TcpStream;
 use std::io::{Read, Write};
 use std::cmp::min;
 use super::storage::FileStorage;
-use super::error::{TransporterResult, TransporterError, error};
+use super::error::{TransporterResult, TransporterError};
 use super::scotty::Scotty;
 use super::config::Config;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -15,12 +15,14 @@ enum ClientMessages {
     StartBeamingFile,
 }
 
+
+
 impl ClientMessages {
     fn from_u8(code: u8) -> TransporterResult<ClientMessages> {
         match code {
             0 => Ok(ClientMessages::BeamComplete),
             1 => Ok(ClientMessages::StartBeamingFile),
-            _ => Err(error(format!("Invalid message code {}", code))),
+            _ => Err(TransporterError::InvalidClientMessageCode(code)),
         }
     }
 }
@@ -59,10 +61,7 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
     let file_length = try!(stream.read_u64::<BigEndian>()) as usize;
     let file_name = try!(read_file_name(stream));
 
-    let (file_id, should_beam) = match scotty.file_beam_start(beam_id, &file_name, file_length) {
-        Err(why) => return Err(TransporterError::Message(format!("Cannot get a file id from Scotty: {}", why))),
-        Ok(f) => f
-    };
+    let (file_id, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name, file_length));
 
     if !should_beam {
         try!(stream.write_u8(ServerMessages::SkipFile as u8));
