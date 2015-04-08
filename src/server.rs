@@ -27,7 +27,7 @@ pub fn listen(config: &Config, storage: &FileStorage, raven: &raven::Client) -> 
                                 Err(why) => error!("Cannot send error to Sentry: {}", why),
                                 _ => ()
                             };
-                            error!("Connection closed: {:?}", why); },
+                            error!("Connection closed: {}", why); },
                         Ok(_) => (),
                     };
                 });
