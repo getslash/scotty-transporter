@@ -32,7 +32,12 @@ impl Error for TransporterError {
     }
 
     fn cause(&self) -> Option<&Error> {
-        None
+        match *self {
+            TransporterError::ByteError(ref error) => Some(error),
+            TransporterError::IoError(ref error) => Some(error),
+            TransporterError::ScottyError(ref error) => Some(error),
+            _ => None
+        }
     }
 }
 
