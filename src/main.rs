@@ -20,8 +20,20 @@ use std::env::args;
 use std::path::Path;
 use docopt::Docopt;
 
+#[derive(RustcDecodable, Debug)]
+struct Args {
+    arg_config: String,
+    flag_version: bool,
+}
+
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 static USAGE: &'static str = "
-Usage: transporter <config>
+Usage:
+    transporter <config>
+    transporter --version
+
+Options:
+    --version   Print the version.
 ";
 
 type BeamId = usize;
@@ -43,11 +55,16 @@ fn run(config: &Config) {
 
 fn main() {
     env_logger::init().unwrap();
-    let args = Docopt::new(USAGE)
-        .and_then(|d| d.parse())
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
 
-    let config = match Config::load(&Path::new(&args.get_str("<config>"))) {
+    if args.flag_version {
+        println!("Version {}", VERSION);
+        return;
+    }
+
+    let config = match Config::load(&Path::new(&args.arg_config)) {
         Ok(c) => c,
         Err(why) => panic!("Cannot load configuration: {:?}", why)
     };
