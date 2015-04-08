@@ -49,6 +49,9 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str, length
     while bytes_remaining > 0 {
         let to_read = min(bytes_remaining, read_chunk.len());
         let bytes_read = try!(stream.read(&mut read_chunk[0..to_read]));
+        if bytes_read == 0 {
+            return Err(TransporterError::ClientEOF);
+        }
         try!(file.write_all(&mut read_chunk[0..bytes_read]));
         bytes_remaining -= bytes_read;
     }
