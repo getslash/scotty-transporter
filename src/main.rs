@@ -66,7 +66,7 @@ fn main() {
 
     let config = match Config::load(&Path::new(&args.arg_config)) {
         Ok(c) => c,
-        Err(why) => panic!("Cannot load configuration: {:?}", why)
+        Err(why) => panic!("{}", why)
     };
     run(&config);
 }
