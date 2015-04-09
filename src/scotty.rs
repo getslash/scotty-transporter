@@ -20,6 +20,7 @@ pub struct Scotty<'v> {
 #[derive(RustcDecodable)]
 struct FilePostResponse {
     file_id: String,
+    storage_name: String,
     should_beam: bool
 }
 
@@ -109,7 +110,7 @@ impl<'v> Scotty<'v> {
             json_mime: "application/json".parse().unwrap() }
     }
 
-    pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str, file_size: usize) -> ScottyResult<(String, bool)> {
+    pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str, file_size: usize) -> ScottyResult<(String, String, bool)> {
         let url = format!("{}/files", self.url);
         let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id, file_size: file_size };
         let encoded_params = try!(encode::<FilePostRequest>(&params));
@@ -121,7 +122,7 @@ impl<'v> Scotty<'v> {
         let mut content = String::new();
         try!(response.read_to_string(&mut content));
         let result = try!(decode::<FilePostResponse>(&content));
-        Ok((result.file_id, result.should_beam))
+        Ok((result.file_id, result.storage_name, result.should_beam))
     }
 
     pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>) -> ScottyResult<()> {

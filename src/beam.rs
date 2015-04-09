@@ -64,7 +64,7 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
     let file_length = try!(stream.read_u64::<BigEndian>()) as usize;
     let file_name = try!(read_file_name(stream));
 
-    let (file_id, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name, file_length));
+    let (file_id, storage_name, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name, file_length));
 
     if !should_beam {
         try!(stream.write_u8(ServerMessages::SkipFile as u8));
@@ -73,9 +73,9 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 
     try!(stream.write_u8(ServerMessages::BeamFile as u8));
 
-    info!("{} / {}: Beaming up {} ({} bytes) to {}", peer, beam_id, file_name, file_length, file_id);
+    info!("{} / {}: Beaming up {} ({} bytes) to {}", peer, beam_id, file_name, file_length, storage_name);
 
-    match download(stream, storage, &file_id, file_length) {
+    match download(stream, storage, &storage_name, file_length) {
         Ok(_) => {
             info!("Finished beaming up {}", file_name);
             try!(scotty.file_beam_end(&file_id, None));
