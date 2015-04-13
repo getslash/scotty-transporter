@@ -32,7 +32,10 @@ impl Error for ConfigError {
 
 impl fmt::Display for ConfigError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        formatter.write_str("Cannot load configruation")
+        match *self {
+            ConfigError::IoError(ref e) => formatter.write_fmt(format_args!("Configuration IO Error: {}", e)),
+            ConfigError::DecodeError(ref e) => formatter.write_fmt(format_args!("Configuration Decoding Error: {}", e)),
+        }
     }
 }
 

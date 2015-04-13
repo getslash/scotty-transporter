@@ -1,6 +1,5 @@
 use hyper;
 use hyper::Client;
-use hyper::net::HttpConnector;
 use hyper::header::ContentType;
 use hyper::error::HttpError;
 use hyper::status::StatusCode;
@@ -11,15 +10,16 @@ use super::BeamId;
 use std::io::Read;
 use std::io::Error as IoError;
 
-pub struct Scotty<'v> {
+pub struct Scotty {
     url: String,
-    client: Client<HttpConnector<'v>>,
+    client: Client,
     json_mime: hyper::mime::Mime
 }
 
 #[derive(RustcDecodable)]
 struct FilePostResponse {
     file_id: String,
+    storage_name: String,
     should_beam: bool
 }
 
@@ -101,15 +101,15 @@ impl From<IoError> for ScottyError {
 
 type ScottyResult<T> = Result<T, ScottyError>;
 
-impl<'v> Scotty<'v> {
-    pub fn new(url: &String) -> Scotty<'v>{
+impl Scotty {
+    pub fn new(url: &String) -> Scotty{
         Scotty {
             url: url.clone(),
             client: Client::new(),
             json_mime: "application/json".parse().unwrap() }
     }
 
-    pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str, file_size: usize) -> ScottyResult<(String, bool)> {
+    pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str, file_size: usize) -> ScottyResult<(String, String, bool)> {
         let url = format!("{}/files", self.url);
         let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id, file_size: file_size };
         let encoded_params = try!(encode::<FilePostRequest>(&params));
@@ -121,7 +121,7 @@ impl<'v> Scotty<'v> {
         let mut content = String::new();
         try!(response.read_to_string(&mut content));
         let result = try!(decode::<FilePostResponse>(&content));
-        Ok((result.file_id, result.should_beam))
+        Ok((result.file_id, result.storage_name, result.should_beam))
     }
 
     pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>) -> ScottyResult<()> {
