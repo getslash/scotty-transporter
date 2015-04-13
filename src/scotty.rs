@@ -1,6 +1,5 @@
 use hyper;
 use hyper::Client;
-use hyper::net::HttpConnector;
 use hyper::header::ContentType;
 use hyper::error::HttpError;
 use hyper::status::StatusCode;
@@ -11,9 +10,9 @@ use super::BeamId;
 use std::io::Read;
 use std::io::Error as IoError;
 
-pub struct Scotty<'v> {
+pub struct Scotty {
     url: String,
-    client: Client<HttpConnector<'v>>,
+    client: Client,
     json_mime: hyper::mime::Mime
 }
 
@@ -102,8 +101,8 @@ impl From<IoError> for ScottyError {
 
 type ScottyResult<T> = Result<T, ScottyError>;
 
-impl<'v> Scotty<'v> {
-    pub fn new(url: &String) -> Scotty<'v>{
+impl Scotty {
+    pub fn new(url: &String) -> Scotty{
         Scotty {
             url: url.clone(),
             client: Client::new(),
