@@ -2,7 +2,6 @@
 set -e
 
 cd /src
-cargo update
 cargo build --release
 
 rm -rf /pack
