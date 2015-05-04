@@ -106,8 +106,17 @@ pub fn beam_up(stream: &mut TcpStream, storage: &FileStorage, config: &Config) -
     let mut scotty = Scotty::new(&config.scotty_url);
     info!("Received beam up request with beam id {}", beam_id);
 
-    try!(beam_loop(beam_id, stream, storage, &mut scotty));
-    info!("Beam up completed");
-    try!(scotty.complete_beam(beam_id));
-    Ok(())
+    match beam_loop(beam_id, stream, storage, &mut scotty) {
+        Ok(_) => {
+            info!("Beam up completed");
+            try!(scotty.complete_beam(beam_id, None));
+            Ok(())
+        },
+        Err(why) => {
+            error!("Beam up failed: {}", why);
+            let error = format!("Transporter Error: {}", why);
+            try!(scotty.complete_beam(beam_id, Some(&error)));
+            Err(why)
+        }
+    }
 }

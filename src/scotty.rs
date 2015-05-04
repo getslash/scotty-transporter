@@ -37,8 +37,9 @@ struct FileUpdateRequest {
 }
 
 #[derive(RustcEncodable)]
-struct BeamUpdateRequest {
+struct BeamUpdateRequest<'a> {
     completed: bool,
+    error: Option<&'a str>
 }
 
 macro_rules! check_response {
@@ -140,9 +141,9 @@ impl Scotty {
         Ok(())
     }
 
-    pub fn complete_beam(&mut self, beam_id: BeamId) -> ScottyResult<()> {
+    pub fn complete_beam(&mut self, beam_id: BeamId, error: Option<&str>) -> ScottyResult<()> {
         let url = format!("{}/beams/{}", self.url, beam_id);
-        let params = BeamUpdateRequest { completed: true };
+        let params = BeamUpdateRequest { completed: true, error: error };
         let encoded_params = try!(encode::<BeamUpdateRequest>(&params));
         let response = try!(self.client.put(&url[..])
             .body(&encoded_params[..])
