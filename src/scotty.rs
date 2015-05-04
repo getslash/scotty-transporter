@@ -27,18 +27,19 @@ struct FilePostResponse {
 struct FilePostRequest {
     file_name: String,
     beam_id: BeamId,
-    file_size: usize
 }
 
 #[derive(RustcEncodable)]
 struct FileUpdateRequest {
     success: bool,
-    error: String
+    error: String,
+    size: Option<usize>
 }
 
 #[derive(RustcEncodable)]
-struct BeamUpdateRequest {
+struct BeamUpdateRequest<'a> {
     completed: bool,
+    error: Option<&'a str>
 }
 
 macro_rules! check_response {
@@ -109,9 +110,9 @@ impl Scotty {
             json_mime: "application/json".parse().unwrap() }
     }
 
-    pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str, file_size: usize) -> ScottyResult<(String, String, bool)> {
+    pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str) -> ScottyResult<(String, String, bool)> {
         let url = format!("{}/files", self.url);
-        let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id, file_size: file_size };
+        let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id };
         let encoded_params = try!(encode::<FilePostRequest>(&params));
         let request = self.client.post(&url[..])
             .body(&encoded_params[..])
@@ -124,13 +125,13 @@ impl Scotty {
         Ok((result.file_id, result.storage_name, result.should_beam))
     }
 
-    pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>) -> ScottyResult<()> {
+    pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>, file_size: Option<usize>) -> ScottyResult<()> {
         let url = format!("{}/files/{}", self.url, file_id);
         let error_string = match err {
             Some(err) => err.description(),
             _ => ""
         };
-        let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string() };
+        let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string(), size: file_size };
         let encoded_params = try!(encode::<FileUpdateRequest>(&params));
         let response = try!(self.client.put(&url[..])
             .body(&encoded_params[..])
@@ -140,9 +141,9 @@ impl Scotty {
         Ok(())
     }
 
-    pub fn complete_beam(&mut self, beam_id: BeamId) -> ScottyResult<()> {
+    pub fn complete_beam(&mut self, beam_id: BeamId, error: Option<&str>) -> ScottyResult<()> {
         let url = format!("{}/beams/{}", self.url, beam_id);
-        let params = BeamUpdateRequest { completed: true };
+        let params = BeamUpdateRequest { completed: true, error: error };
         let encoded_params = try!(encode::<BeamUpdateRequest>(&params));
         let response = try!(self.client.put(&url[..])
             .body(&encoded_params[..])

@@ -10,18 +10,21 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 const CHUNK_SIZE: usize = 4096usize;
 
-enum ClientMessages {
+#[derive(Debug)]
+pub enum ClientMessages {
     BeamComplete,
     StartBeamingFile,
+    FileChunk,
+    FileDone
 }
-
-
 
 impl ClientMessages {
     fn from_u8(code: u8) -> TransporterResult<ClientMessages> {
         match code {
             0 => Ok(ClientMessages::BeamComplete),
             1 => Ok(ClientMessages::StartBeamingFile),
+            2 => Ok(ClientMessages::FileChunk),
+            3 => Ok(ClientMessages::FileDone),
             _ => Err(TransporterError::InvalidClientMessageCode(code)),
         }
     }
@@ -41,30 +44,39 @@ fn read_file_name(stream: &mut TcpStream) -> TransporterResult<String> {
     Ok(file_name)
 }
 
-fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str, length: usize) -> TransporterResult<()> {
+fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> TransporterResult<usize> {
     let mut file = try!(storage.create(file_id));
-    let mut bytes_remaining = length;
+    let mut length: usize = 0;
     let mut read_chunk = [0u8; CHUNK_SIZE];
 
-    while bytes_remaining > 0 {
-        let to_read = min(bytes_remaining, read_chunk.len());
-        let bytes_read = try!(stream.read(&mut read_chunk[0..to_read]));
-        if bytes_read == 0 {
-            return Err(TransporterError::ClientEOF);
+    loop {
+        let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8())));
+        match message_code {
+            ClientMessages::FileChunk => (),
+            ClientMessages::FileDone => return Ok(length),
+            _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
-        try!(file.write_all(&mut read_chunk[0..bytes_read]));
-        bytes_remaining -= bytes_read;
-    }
 
-    Ok(())
+        let chunk_size = try!(stream.read_u32::<BigEndian>());
+        let mut bytes_remaining = chunk_size as usize;
+        while bytes_remaining > 0 {
+            let to_read = min(bytes_remaining, read_chunk.len());
+            let bytes_read = try!(stream.read(&mut read_chunk[0..to_read]));
+            if bytes_read == 0 {
+                return Err(TransporterError::ClientEOF);
+            }
+            try!(file.write_all(&mut read_chunk[0..bytes_read]));
+            bytes_remaining -= bytes_read;
+            length += bytes_read;
+        }
+    }
 }
 
 fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty) -> TransporterResult<()> {
     let peer = try!(stream.peer_addr());
-    let file_length = try!(stream.read_u64::<BigEndian>()) as usize;
     let file_name = try!(read_file_name(stream));
 
-    let (file_id, storage_name, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name, file_length));
+    let (file_id, storage_name, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name));
 
     if !should_beam {
         try!(stream.write_u8(ServerMessages::SkipFile as u8));
@@ -73,18 +85,18 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 
     try!(stream.write_u8(ServerMessages::BeamFile as u8));
 
-    info!("{} / {}: Beaming up {} ({} bytes) to {}", peer, beam_id, file_name, file_length, storage_name);
+    info!("{} / {}: Beaming up {} to {}", peer, beam_id, file_name, storage_name);
 
-    match download(stream, storage, &storage_name, file_length) {
-        Ok(_) => {
-            info!("Finished beaming up {}", file_name);
-            try!(scotty.file_beam_end(&file_id, None));
+    match download(stream, storage, &storage_name) {
+        Ok(length) => {
+            info!("Finished beaming up {} ({} bytes)", file_name, length);
+            try!(scotty.file_beam_end(&file_id, None, Some(length)));
             try!(stream.write_u8(ServerMessages::FileBeamed as u8));
             Ok(())
             },
         Err(why) => {
             info!("Error beaming up {}: {}", file_name, why);
-            try!(scotty.file_beam_end(&file_id, Some(&why)));
+            try!(scotty.file_beam_end(&file_id, Some(&why), None));
             Err(why)
         }
     }
@@ -97,6 +109,7 @@ fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
         match message_code {
             ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty)),
             ClientMessages::BeamComplete => return Ok(()),
+            _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
     }
 }
@@ -106,8 +119,17 @@ pub fn beam_up(stream: &mut TcpStream, storage: &FileStorage, config: &Config) -
     let mut scotty = Scotty::new(&config.scotty_url);
     info!("Received beam up request with beam id {}", beam_id);
 
-    try!(beam_loop(beam_id, stream, storage, &mut scotty));
-    info!("Beam up completed");
-    try!(scotty.complete_beam(beam_id));
-    Ok(())
+    match beam_loop(beam_id, stream, storage, &mut scotty) {
+        Ok(_) => {
+            info!("Beam up completed");
+            try!(scotty.complete_beam(beam_id, None));
+            Ok(())
+        },
+        Err(why) => {
+            error!("Beam up failed: {}", why);
+            let error = format!("Transporter Error: {}", why);
+            try!(scotty.complete_beam(beam_id, Some(&error)));
+            Err(why)
+        }
+    }
 }
