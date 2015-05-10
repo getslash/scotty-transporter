@@ -16,14 +16,20 @@ pub fn listen(config: &Config, storage: &FileStorage, raven: &raven::Client) -> 
     info!("Listening for connections in {}", config.bind_address);
     for stream in listener.incoming() {
         match stream {
-            Ok(mut stream) => {
+            Ok(stream) => {
                 let storage = storage.clone();
                 let config = config.clone();
-                let raven = (*raven).clone();
+                let raven = raven.clone();
+                let mut error_tags: Vec<(String, String)> = Vec::new();
+                match stream.peer_addr() {
+                    Err(why) => error!("Cannot get peer address for socket: {}", why),
+                    Ok(peer) => error_tags.push((format!("peer"), format!("{}", peer))),
+                };
                 thread::spawn(move || {
-                    match beam_up(&mut stream, &storage, &config) {
+                    match beam_up(stream, storage, config, &mut error_tags) {
                         Err(why) => {
-                            match raven.capture_error(&why, &[]) {
+                            let tags: Vec<_> = error_tags.iter().map(|&(ref a, ref b)| (a as &str, b as &str)).collect();
+                            match raven.capture_error(&why, &tags) {
                                 Err(why) => error!("Cannot send error to Sentry: {}", why),
                                 _ => ()
                             };

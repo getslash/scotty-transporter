@@ -114,12 +114,13 @@ fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
     }
 }
 
-pub fn beam_up(stream: &mut TcpStream, storage: &FileStorage, config: &Config) -> TransporterResult<()> {
+pub fn beam_up(mut stream: TcpStream, storage: FileStorage, config: Config, error_tags: &mut Vec<(String, String)>) -> TransporterResult<()> {
     let beam_id = try!(stream.read_u64::<BigEndian>()) as usize;
+    error_tags.push((format!("beam_id"), format!("{}", beam_id)));
     let mut scotty = Scotty::new(&config.scotty_url);
     info!("Received beam up request with beam id {}", beam_id);
 
-    match beam_loop(beam_id, stream, storage, &mut scotty) {
+    match beam_loop(beam_id, &mut stream, &storage, &mut scotty) {
         Ok(_) => {
             info!("Beam up completed");
             try!(scotty.complete_beam(beam_id, None));
