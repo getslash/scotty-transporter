@@ -19,7 +19,7 @@ pub fn listen(config: &Config, storage: &FileStorage, raven: &raven::Client) -> 
             Ok(mut stream) => {
                 let storage = storage.clone();
                 let config = config.clone();
-                let raven = (*raven).clone();
+                let raven = raven.clone();
                 thread::spawn(move || {
                     match beam_up(&mut stream, &storage, &config) {
                         Err(why) => {
