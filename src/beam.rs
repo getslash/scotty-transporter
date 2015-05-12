@@ -8,7 +8,7 @@ use super::config::Config;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 
-const CHUNK_SIZE: usize = 4096usize;
+const CHUNK_SIZE: usize = 1048576usize;
 
 #[derive(Debug)]
 pub enum ClientMessages {
