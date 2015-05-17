@@ -12,3 +12,4 @@
 .vagrant
 
 storage
+*.deb
