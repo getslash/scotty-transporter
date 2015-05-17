@@ -12,6 +12,9 @@ pub struct Config {
     pub bind_address: String,
     pub scotty_url: String,
     pub sentry_dsn: String,
+    pub log_file: Option<String>,
+    pub log_stdout: bool,
+    pub log_level: String,
 }
 
 #[derive(Debug)]

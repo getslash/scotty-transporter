@@ -12,12 +12,14 @@ extern crate byteorder;
 extern crate url;
 extern crate raven;
 #[macro_use] extern crate log;
-extern crate env_logger;
+extern crate fern;
+extern crate time;
 
 use storage::FileStorage;
 use config::Config;
 use std::env::args;
 use std::path::Path;
+use std::str::FromStr;
 use docopt::Docopt;
 
 #[derive(RustcDecodable, Debug)]
@@ -54,7 +56,6 @@ fn run(config: &Config) {
 }
 
 fn main() {
-    env_logger::init().unwrap();
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
@@ -64,9 +65,34 @@ fn main() {
         return;
     }
 
-    let config = match Config::load(&Path::new(&args.arg_config)) {
-        Ok(c) => c,
-        Err(why) => panic!("{}", why)
+    let config = Config::load(&Path::new(&args.arg_config)).unwrap();
+
+    let log_level = log::LogLevelFilter::from_str(&config.log_level).unwrap();
+    let output = {
+        let mut output = vec![];
+
+        match config.log_file {
+            Some(ref log_file) => output.push(fern::OutputConfig::file(log_file)),
+            _ => ()
+        };
+
+        if config.log_stdout {
+            output.push(fern::OutputConfig::stdout());
+        }
+
+        output
     };
+
+    let logger_config = fern::DispatchConfig {
+        format: Box::new(|msg: &str, level: &log::LogLevel, location: &log::LogLocation| {
+            // This is a fairly simple format, though it's possible to do more complicated ones.
+            // This closure can contain any code, as long as it produces a String message.
+            format!("[{} {}/{}] {}", time::now().strftime("%Y-%m-%d %H:%M:%S").unwrap(), location.module_path(), level, msg)
+        }),
+        output: output,
+        level: log_level,
+    };
+
+    fern::init_global_logger(logger_config, log::LogLevelFilter::Trace).unwrap();
     run(&config);
 }

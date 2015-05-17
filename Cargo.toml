@@ -7,11 +7,12 @@ authors = ["Roey Darwish Dror <roeyd@infinidat.com>"]
 [dependencies]
 byteorder = "*"
 docopt = "*"
-env_logger = "*"
+fern = "*"
 log = "*"
 rustc-serialize = "*"
 url = "*"
 hyper = "*"
+time = "*"
 
 [dependencies.raven]
 git = "https://github.com/r-darwish/raven-rust.git"
