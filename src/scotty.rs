@@ -1,7 +1,7 @@
 use hyper;
 use hyper::Client;
 use hyper::header::ContentType;
-use hyper::error::HttpError;
+use hyper::error::Error as HttpError;
 use hyper::status::StatusCode;
 use std::error::Error;
 use std::fmt;
