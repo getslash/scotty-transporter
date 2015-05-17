@@ -73,19 +73,23 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> Tra
 }
 
 fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty) -> TransporterResult<()> {
-    let peer = try!(stream.peer_addr());
+    debug!("{}: Got a request to beam up file", beam_id);
     let file_name = try!(read_file_name(stream));
+    debug!("{}: File name is {}", beam_id, file_name);
 
     let (file_id, storage_name, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name));
+    debug!("{}: ID of {} is {}.", beam_id, file_name, file_id);
 
     if !should_beam {
+        debug!("{}: Notifying the client that we should'nt beam {}.", beam_id, file_id);
         try!(stream.write_u8(ServerMessages::SkipFile as u8));
         return Ok(());
     }
 
+    debug!("{}: Notifying the client that we should beam {}.", beam_id, file_id);
     try!(stream.write_u8(ServerMessages::BeamFile as u8));
 
-    info!("{} / {}: Beaming up {} to {}", peer, beam_id, file_name, storage_name);
+    info!("{}: Beaming up {} to {}", beam_id, file_name, storage_name);
 
     match download(stream, storage, &storage_name) {
         Ok(length) => {

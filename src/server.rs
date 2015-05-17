@@ -13,6 +13,7 @@ pub fn listen(config: &Config, storage: &FileStorage, raven: &raven::Client) -> 
         Err(why) => panic!("Server bind error: {}", why)
     };
 
+    debug!("Debug messages are on");
     info!("Listening for connections in {}", config.bind_address);
     for stream in listener.incoming() {
         match stream {
