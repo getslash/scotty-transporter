@@ -73,13 +73,13 @@ impl Error for ScottyError {
 }
 
 impl fmt::Display for ScottyError {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            ScottyError::EncoderError(ref e) => formatter.write_fmt(format_args!("Encoder Error: {}", e)),
-            ScottyError::DecoderError(ref e) => formatter.write_fmt(format_args!("Deocder Error: {}", e)),
-            ScottyError::HttpError(ref e) => formatter.write_fmt(format_args!("Http Error: {}", e)),
-            ScottyError::IoError(ref e) => formatter.write_fmt(format_args!("IO Error: {}", e)),
-            ScottyError::ScottyError(code, ref url) => formatter.write_fmt(format_args!("Scotty returned {} for {}", code, url))
+            ScottyError::EncoderError(ref e) => write!(f, "Encoder Error: {}", e),
+            ScottyError::DecoderError(ref e) => write!(f, "Deocder Error: {}", e),
+            ScottyError::HttpError(ref e) => write!(f, "Http Error: {}", e),
+            ScottyError::IoError(ref e) => write!(f, "IO Error: {}", e),
+            ScottyError::ScottyError(code, ref url) => write!(f, "Scotty returned {} for {}", code, url)
         }
     }
 }
