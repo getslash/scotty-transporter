@@ -44,14 +44,14 @@ impl Error for TransporterError {
 }
 
 impl fmt::Display for TransporterError {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            TransporterError::InvalidClientMessageCode(code) => formatter.write_fmt(format_args!("Invalid message code: {}", code)),
-            TransporterError::UnexpectedClientMessageCode(ref code) => formatter.write_fmt(format_args!("Unexpected message code: {:?}", code)),
-            TransporterError::ByteError(ref error) => formatter.write_fmt(format_args!("Byte error: {}", error)),
-            TransporterError::IoError(ref error) => formatter.write_fmt(format_args!("IO error: {}", error)),
-            TransporterError::ScottyError(ref error) => formatter.write_fmt(format_args!("Scotty error: {}", error)),
-            TransporterError::ClientEOF => formatter.write_str("Client close the connection in a middle of a beam"),
+            TransporterError::InvalidClientMessageCode(code) => write!(f, "Invalid message code: {}", code),
+            TransporterError::UnexpectedClientMessageCode(ref code) => write!(f, "Unexpected message code: {:?}", code),
+            TransporterError::ByteError(ref error) => write!(f, "Byte error: {}", error),
+            TransporterError::IoError(ref error) => write!(f, "IO error: {}", error),
+            TransporterError::ScottyError(ref error) => write!(f, "Scotty error: {}", error),
+            TransporterError::ClientEOF => write!(f, "Client close the connection in a middle of a beam"),
         }
     }
 }
