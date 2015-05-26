@@ -43,6 +43,19 @@ impl Error for TransporterError {
     }
 }
 
+impl TransporterError {
+    pub fn is_disconnection(&self) -> bool {
+        match *self {
+            TransporterError::ByteError(ref byte_error) => match *byte_error {
+                ByteError::UnexpectedEOF => true,
+                _ => false
+            },
+            TransporterError::ClientEOF => true,
+            _ => false
+        }
+    }
+}
+
 impl fmt::Display for TransporterError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
