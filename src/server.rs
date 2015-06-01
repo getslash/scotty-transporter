@@ -29,11 +29,13 @@ pub fn listen(config: &Config, storage: &FileStorage, raven: &raven::Client) -> 
                 thread::spawn(move || {
                     match beam_up(stream, storage, config, &mut error_tags) {
                         Err(why) => {
-                            let tags: Vec<_> = error_tags.iter().map(|&(ref a, ref b)| (a as &str, b as &str)).collect();
-                            match raven.capture_error(&why, &tags) {
-                                Err(why) => error!("Cannot send error to Sentry: {}", why),
-                                _ => ()
-                            };
+                            if !why.is_disconnection() {
+                                let tags: Vec<_> = error_tags.iter().map(|&(ref a, ref b)| (a as &str, b as &str)).collect();
+                                match raven.capture_error(&why, &tags) {
+                                    Err(why) => error!("Cannot send error to Sentry: {}", why),
+                                    _ => ()
+                                };
+                            }
                             error!("Connection closed: {}", why); },
                         Ok(_) => (),
                     };
