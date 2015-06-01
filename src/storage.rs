@@ -1,7 +1,7 @@
 use std::fs::{File, metadata};
 use std::io::Result;
 use std::path::{Path,PathBuf};
-use super::error::TransporterResult;
+use super::error::{TransporterResult, TransporterError};
 
 #[derive(Clone)]
 pub struct FileStorage {
@@ -19,7 +19,7 @@ impl FileStorage {
         let mut path_buffer = PathBuf::new();
         path_buffer.push(&self.base_directory);
         path_buffer.push(file_name);
-        let file = try!(File::create(&path_buffer));
+        let file = try!(File::create(&path_buffer).map_err(|io| TransporterError::StorageIoError(io)));
         Ok(file)
     }
 }

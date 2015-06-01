@@ -6,6 +6,7 @@ use super::error::{TransporterResult, TransporterError};
 use super::scotty::Scotty;
 use super::config::Config;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::Error as ByteError;
 
 
 const CHUNK_SIZE: usize = 1048576usize;
@@ -36,10 +37,18 @@ enum ServerMessages {
     FileBeamed = 2,
 }
 
+fn map_byte_err(error: ByteError) -> TransporterError {
+    match error {
+        ByteError::UnexpectedEOF => TransporterError::ClientEOF,
+        ByteError::Io(io) => TransporterError::ClientIoError(io)
+    }
+}
+
 fn read_file_name(stream: &mut TcpStream) -> TransporterResult<String> {
-    let file_name_length = try!(stream.read_u16::<BigEndian>()) as usize;
+    let file_name_length = try!(stream.read_u16::<BigEndian>().map_err(map_byte_err)) as usize;
     let mut file_name = String::new();
-    let file_name_length_read = try!(stream.take(file_name_length as u64).read_to_string(&mut file_name));
+    let file_name_length_read = try!(stream.take(file_name_length as u64).read_to_string(&mut file_name).map_err(
+        |io| TransporterError::ClientIoError(io)));
     assert_eq!(file_name_length_read, file_name_length);
     Ok(file_name)
 }
@@ -50,22 +59,24 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> Tra
     let mut read_chunk = [0u8; CHUNK_SIZE];
 
     loop {
-        let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8())));
+        let message_code = try!(stream.read_u8().map_err(map_byte_err)
+            .and_then(|m| ClientMessages::from_u8(m)));
         match message_code {
             ClientMessages::FileChunk => (),
             ClientMessages::FileDone => return Ok(length),
             _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
 
-        let chunk_size = try!(stream.read_u32::<BigEndian>());
+        let chunk_size = try!(stream.read_u32::<BigEndian>().map_err(map_byte_err));
         let mut bytes_remaining = chunk_size as usize;
         while bytes_remaining > 0 {
             let to_read = min(bytes_remaining, read_chunk.len());
-            let bytes_read = try!(stream.read(&mut read_chunk[0..to_read]));
+            let bytes_read = try!(
+                stream.read(&mut read_chunk[0..to_read]).map_err(|io| TransporterError::ClientIoError(io)));
             if bytes_read == 0 {
                 return Err(TransporterError::ClientEOF);
             }
-            try!(file.write_all(&mut read_chunk[0..bytes_read]));
+            try!(file.write_all(&mut read_chunk[0..bytes_read]).map_err(|io| TransporterError::StorageIoError(io)));
             bytes_remaining -= bytes_read;
             length += bytes_read;
         }
@@ -82,12 +93,12 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 
     if !should_beam {
         debug!("{}: Notifying the client that we should'nt beam {}.", beam_id, file_id);
-        try!(stream.write_u8(ServerMessages::SkipFile as u8));
+        try!(stream.write_u8(ServerMessages::SkipFile as u8).map_err(map_byte_err));
         return Ok(());
     }
 
     debug!("{}: Notifying the client that we should beam {}.", beam_id, file_id);
-    try!(stream.write_u8(ServerMessages::BeamFile as u8));
+    try!(stream.write_u8(ServerMessages::BeamFile as u8).map_err(map_byte_err));
 
     info!("{}: Beaming up {} to {}", beam_id, file_name, storage_name);
 
@@ -95,7 +106,7 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
         Ok(length) => {
             info!("Finished beaming up {} ({} bytes)", file_name, length);
             try!(scotty.file_beam_end(&file_id, None, Some(length)));
-            try!(stream.write_u8(ServerMessages::FileBeamed as u8));
+            try!(stream.write_u8(ServerMessages::FileBeamed as u8).map_err(map_byte_err));
             Ok(())
             },
         Err(why) => {
@@ -109,7 +120,7 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty) -> TransporterResult<()>
 {
     loop {
-        let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8())));
+        let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8().map_err(map_byte_err))));
         match message_code {
             ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty)),
             ClientMessages::BeamComplete => return Ok(()),
@@ -119,7 +130,7 @@ fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 }
 
 pub fn beam_up(mut stream: TcpStream, storage: FileStorage, config: Config, error_tags: &mut Vec<(String, String)>) -> TransporterResult<()> {
-    let beam_id = try!(stream.read_u64::<BigEndian>()) as usize;
+    let beam_id = try!(stream.read_u64::<BigEndian>().map_err(map_byte_err)) as usize;
     error_tags.push((format!("beam_id"), format!("{}", beam_id)));
     let mut scotty = Scotty::new(&config.scotty_url);
     info!("Received beam up request with beam id {}", beam_id);
