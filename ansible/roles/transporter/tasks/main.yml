@@ -4,6 +4,8 @@
 - include: rust.yml
   when: rust.stat.exists == False
 
+- apt: update_cache=True
 - include: fpm.yml
-
 - apt: name=libssl-dev state=present
+
+- file: src=/vagrant dest=/src state=link
