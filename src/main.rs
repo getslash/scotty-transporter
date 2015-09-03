@@ -14,6 +14,7 @@ extern crate raven;
 #[macro_use] extern crate log;
 extern crate fern;
 extern crate time;
+extern crate crypto;
 
 use storage::FileStorage;
 use config::Config;

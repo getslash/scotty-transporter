@@ -13,6 +13,7 @@ rustc-serialize = "*"
 url = "*"
 hyper = "*"
 time = "*"
+rust-crypto = "*"
 
 [dependencies.raven]
 git = "https://github.com/r-darwish/raven-rust.git"
