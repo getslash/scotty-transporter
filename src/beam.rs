@@ -7,6 +7,8 @@ use super::scotty::Scotty;
 use super::config::Config;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use byteorder::Error as ByteError;
+use crypto::sha2::Sha512;
+use crypto::digest::Digest;
 
 
 const CHUNK_SIZE: usize = 1048576usize;
@@ -37,6 +39,8 @@ enum ServerMessages {
     FileBeamed = 2,
 }
 
+type FileData = (usize, Sha512);
+
 fn map_byte_err(error: ByteError) -> TransporterError {
     match error {
         ByteError::UnexpectedEOF => TransporterError::ClientEOF,
@@ -53,8 +57,9 @@ fn read_file_name(stream: &mut TcpStream) -> TransporterResult<String> {
     Ok(file_name)
 }
 
-fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> TransporterResult<usize> {
+fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> TransporterResult<FileData> {
     let mut file = try!(storage.create(file_id));
+    let mut checksum = Sha512::new();
     let mut length: usize = 0;
     let mut read_chunk = [0u8; CHUNK_SIZE];
 
@@ -63,7 +68,7 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> Tra
             .and_then(|m| ClientMessages::from_u8(m)));
         match message_code {
             ClientMessages::FileChunk => (),
-            ClientMessages::FileDone => return Ok(length),
+            ClientMessages::FileDone => return Ok((length, checksum)),
             _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
 
@@ -76,6 +81,7 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> Tra
             if bytes_read == 0 {
                 return Err(TransporterError::ClientEOF);
             }
+            checksum.input(&read_chunk[0..bytes_read]);
             try!(file.write_all(&mut read_chunk[0..bytes_read]).map_err(|io| TransporterError::StorageIoError(io)));
             bytes_remaining -= bytes_read;
             length += bytes_read;
@@ -103,15 +109,16 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
     info!("{}: Beaming up {} to {}", beam_id, file_name, storage_name);
 
     match download(stream, storage, &storage_name) {
-        Ok(length) => {
+        Ok(data) => {
+            let (length, mut checksum) = data;
             info!("Finished beaming up {} ({} bytes)", file_name, length);
-            try!(scotty.file_beam_end(&file_id, None, Some(length)));
+            try!(scotty.file_beam_end(&file_id, None, Some(length), Some(checksum.result_str())));
             try!(stream.write_u8(ServerMessages::FileBeamed as u8).map_err(map_byte_err));
             Ok(())
             },
         Err(why) => {
             info!("Error beaming up {}: {}", file_name, why);
-            try!(scotty.file_beam_end(&file_id, Some(&why), None));
+            try!(scotty.file_beam_end(&file_id, Some(&why), None, None));
             Err(why)
         }
     }
