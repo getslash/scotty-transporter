@@ -12,7 +12,6 @@ use std::io::Error as IoError;
 
 pub struct Scotty {
     url: String,
-    client: Client,
     json_mime: hyper::mime::Mime
 }
 
@@ -107,7 +106,6 @@ impl Scotty {
     pub fn new(url: &String) -> Scotty{
         Scotty {
             url: url.clone(),
-            client: Client::new(),
             json_mime: "application/json".parse().unwrap() }
     }
 
@@ -115,7 +113,8 @@ impl Scotty {
         let url = format!("{}/files", self.url);
         let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id };
         let encoded_params = try!(encode::<FilePostRequest>(&params));
-        let request = self.client.post(&url[..])
+        let client = Client::new();
+        let request = client.post(&url[..])
             .body(&encoded_params[..])
             .header(ContentType(self.json_mime.clone()));
         let mut response = try!(request.send());
@@ -134,7 +133,8 @@ impl Scotty {
         };
         let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string(), size: file_size, checksum: file_checksum};
         let encoded_params = try!(encode::<FileUpdateRequest>(&params));
-        let response = try!(self.client.put(&url[..])
+        let client = Client::new();
+        let response = try!(client.put(&url[..])
             .body(&encoded_params[..])
             .header(ContentType(self.json_mime.clone()))
             .send());
@@ -146,7 +146,8 @@ impl Scotty {
         let url = format!("{}/beams/{}", self.url, beam_id);
         let params = BeamUpdateRequest { completed: true, error: error };
         let encoded_params = try!(encode::<BeamUpdateRequest>(&params));
-        let response = try!(self.client.put(&url[..])
+        let client = Client::new();
+        let response = try!(client.put(&url[..])
             .body(&encoded_params[..])
             .header(ContentType(self.json_mime.clone()))
             .send());
