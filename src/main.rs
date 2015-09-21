@@ -69,26 +69,14 @@ fn main() {
     let config = Config::load(&Path::new(&args.arg_config)).unwrap();
 
     let log_level = log::LogLevelFilter::from_str(&config.log_level).unwrap();
-    let output = {
-        let mut output = vec![];
-
-        match config.log_file {
-            Some(ref log_file) => output.push(fern::OutputConfig::file(log_file)),
-            _ => ()
-        };
-
-        if config.log_stdout {
-            output.push(fern::OutputConfig::stdout());
-        }
-
-        output
-    };
+    let mut output = vec![];
+    output.push(fern::OutputConfig::stdout());
 
     let logger_config = fern::DispatchConfig {
-        format: Box::new(|msg: &str, level: &log::LogLevel, location: &log::LogLocation| {
+        format: Box::new(|msg: &str, _: &log::LogLevel, location: &log::LogLocation| {
             // This is a fairly simple format, though it's possible to do more complicated ones.
             // This closure can contain any code, as long as it produces a String message.
-            format!("[{} {}/{}] {}", time::now().strftime("%Y-%m-%d %H:%M:%S").unwrap(), location.module_path(), level, msg)
+            format!("[{}] {}", location.module_path(), msg)
         }),
         output: output,
         level: log_level,
