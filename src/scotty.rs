@@ -3,12 +3,17 @@ use hyper::Client;
 use hyper::header::ContentType;
 use hyper::error::Error as HttpError;
 use hyper::status::StatusCode;
+use hyper::method::Method;
 use std::error::Error;
 use std::fmt;
+use std::thread::sleep_ms;
 use rustc_serialize::json::{EncoderError, DecoderError, encode, decode};
 use super::BeamId;
 use std::io::Read;
 use std::io::Error as IoError;
+
+const TIME_TO_SLEEP : u32 = 5000;
+const MAX_ATTEMPTS : u32 = 60000 / TIME_TO_SLEEP * 1;
 
 pub struct Scotty {
     url: String,
@@ -42,20 +47,13 @@ struct BeamUpdateRequest<'a> {
     error: Option<&'a str>
 }
 
-macro_rules! check_response {
-    ($response:ident, $url:ident) => (
-        if $response.status != hyper::status::StatusCode::Ok {
-            return Err(ScottyError::ScottyError($response.status, From::from(&$url as &str)));
-        }
-    )
-}
-
 #[derive(Debug)]
 pub enum ScottyError {
     EncoderError(EncoderError),
     DecoderError(DecoderError),
     HttpError(HttpError),
     ScottyError(StatusCode, String),
+    ScottyIsDown,
     IoError(IoError),
 }
 
@@ -79,6 +77,7 @@ impl fmt::Display for ScottyError {
             ScottyError::DecoderError(ref e) => write!(f, "Deocder Error: {}", e),
             ScottyError::HttpError(ref e) => write!(f, "Http Error: {}", e),
             ScottyError::IoError(ref e) => write!(f, "IO Error: {}", e),
+            ScottyError::ScottyIsDown => write!(f, "Scotty is Down"),
             ScottyError::ScottyError(code, ref url) => write!(f, "Scotty returned {} for {}", code, url)
         }
     }
@@ -109,49 +108,61 @@ impl Scotty {
             json_mime: "application/json".parse().unwrap() }
     }
 
+    fn send_request(&self, method: Method, url: String, json: &str) -> ScottyResult<String> {
+        let client = Client::new();
+        let mut content = String::new();
+        for attempt in 0..MAX_ATTEMPTS {
+            let mut response = {
+                let request = client.request(method.clone(), &url[..])
+                    .body(json)
+                    .header(ContentType(self.json_mime.clone()));
+                try!(request.send())
+            };
+
+            match response.status {
+                StatusCode::Ok => {
+                    try!(response.read_to_string(&mut content));
+                    return Ok(content);
+                },
+                StatusCode::BadGateway | StatusCode::GatewayTimeout => {
+                    error!("Scotty returned {}. Attempt {} out of {}", response.status, attempt + 1, MAX_ATTEMPTS);
+                    sleep_ms(TIME_TO_SLEEP);
+                },
+                _ => { return Err(ScottyError::ScottyError(response.status, url)); }
+            }
+        }
+        Err(ScottyError::ScottyIsDown)
+    }
+
     pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str) -> ScottyResult<(String, String, bool)> {
-        let url = format!("{}/files", self.url);
         let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id };
         let encoded_params = try!(encode::<FilePostRequest>(&params));
-        let client = Client::new();
-        let request = client.post(&url[..])
-            .body(&encoded_params[..])
-            .header(ContentType(self.json_mime.clone()));
-        let mut response = try!(request.send());
-        check_response!(response, url);
-        let mut content = String::new();
-        try!(response.read_to_string(&mut content));
-        let result = try!(decode::<FilePostResponse>(&content));
-        Ok((result.file_id, result.storage_name, result.should_beam))
+        let result = try!(
+            self.send_request(Method::Post, format!("{}/files", self.url), &encoded_params));
+        let file_params = try!(decode::<FilePostResponse>(&result));
+        Ok((file_params.file_id, file_params.storage_name, file_params.should_beam))
     }
 
     pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>, file_size: Option<usize>, file_checksum: Option<String>) -> ScottyResult<()> {
-        let url = format!("{}/files/{}", self.url, file_id);
         let error_string = match err {
             Some(err) => err.description(),
             _ => ""
         };
         let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string(), size: file_size, checksum: file_checksum};
         let encoded_params = try!(encode::<FileUpdateRequest>(&params));
-        let client = Client::new();
-        let response = try!(client.put(&url[..])
-            .body(&encoded_params[..])
-            .header(ContentType(self.json_mime.clone()))
-            .send());
-        check_response!(response, url);
+        try!(
+            self.send_request(
+                Method::Put,
+                format!("{}/files/{}", self.url, file_id),
+                &encoded_params));
         Ok(())
     }
 
     pub fn complete_beam(&mut self, beam_id: BeamId, error: Option<&str>) -> ScottyResult<()> {
-        let url = format!("{}/beams/{}", self.url, beam_id);
         let params = BeamUpdateRequest { completed: true, error: error };
         let encoded_params = try!(encode::<BeamUpdateRequest>(&params));
-        let client = Client::new();
-        let response = try!(client.put(&url[..])
-            .body(&encoded_params[..])
-            .header(ContentType(self.json_mime.clone()))
-            .send());
-        check_response!(response, url);
+        try!(
+            self.send_request(Method::Put, format!("{}/beams/{}", self.url, beam_id), &encoded_params));
         Ok(())
     }
 }
