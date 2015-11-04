@@ -1,0 +1,12 @@
+[Unit]
+Description=Scotty Transporter
+After=network.target
+
+[Service]
+Type=simple
+User=scotty
+Group=scotty
+ExecStart=/usr/bin/transporter /etc/transporter.conf
+
+[Install]
+WantedBy=multi-user.target
