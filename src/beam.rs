@@ -1,6 +1,7 @@
 use std::net::TcpStream;
 use std::io::{Read, Write};
 use std::cmp::min;
+use super::Mtime;
 use super::storage::FileStorage;
 use super::error::{TransporterResult, TransporterError};
 use super::scotty::Scotty;
@@ -18,7 +19,8 @@ pub enum ClientMessages {
     BeamComplete,
     StartBeamingFile,
     FileChunk,
-    FileDone
+    FileDone,
+    ProtocolVersion
 }
 
 impl ClientMessages {
@@ -28,7 +30,31 @@ impl ClientMessages {
             1 => Ok(ClientMessages::StartBeamingFile),
             2 => Ok(ClientMessages::FileChunk),
             3 => Ok(ClientMessages::FileDone),
+            4 => Ok(ClientMessages::ProtocolVersion),
             _ => Err(TransporterError::InvalidClientMessageCode(code)),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ProtocolVersion {
+    V1,
+    V2
+}
+
+impl ProtocolVersion {
+    fn from_u16(code: u16) -> TransporterResult<ProtocolVersion> {
+        match code {
+            1 => Ok(ProtocolVersion::V1),
+            2 => Ok(ProtocolVersion::V2),
+            _ => Err(TransporterError::InvalidProtocolVersion(code)),
+        }
+    }
+
+    fn supports_mtime(&self) -> bool {
+        match *self {
+            ProtocolVersion::V1 => false,
+            _ => true
         }
     }
 }
@@ -39,7 +65,7 @@ enum ServerMessages {
     FileBeamed = 2,
 }
 
-type FileData = (usize, Sha512);
+type FileData = (usize, Sha512, Option<Mtime>);
 
 fn map_byte_err(error: ByteError) -> TransporterError {
     match error {
@@ -57,18 +83,24 @@ fn read_file_name(stream: &mut TcpStream) -> TransporterResult<String> {
     Ok(file_name)
 }
 
-fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> TransporterResult<FileData> {
+fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str, protocol_version: &ProtocolVersion) -> TransporterResult<FileData> {
     let mut file = try!(storage.create(file_id));
     let mut checksum = Sha512::new();
     let mut length: usize = 0;
     let mut read_chunk = [0u8; CHUNK_SIZE];
+
+    let mtime = if protocol_version.supports_mtime() {
+        Some(try!(stream.read_u64::<BigEndian>().map_err(map_byte_err)))
+    } else {
+        None
+    };
 
     loop {
         let message_code = try!(stream.read_u8().map_err(map_byte_err)
             .and_then(|m| ClientMessages::from_u8(m)));
         match message_code {
             ClientMessages::FileChunk => (),
-            ClientMessages::FileDone => return Ok((length, checksum)),
+            ClientMessages::FileDone => return Ok((length, checksum, mtime)),
             _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
 
@@ -89,7 +121,8 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str) -> Tra
     }
 }
 
-fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty) -> TransporterResult<()> {
+fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty,
+             protocol_version: &ProtocolVersion) -> TransporterResult<()> {
     debug!("{}: Got a request to beam up file", beam_id);
     let file_name = try!(read_file_name(stream));
     debug!("{}: File name is {}", beam_id, file_name);
@@ -108,17 +141,17 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 
     info!("{}: Beaming up {} to {}", beam_id, file_name, storage_name);
 
-    match download(stream, storage, &storage_name) {
+    match download(stream, storage, &storage_name, protocol_version) {
         Ok(data) => {
-            let (length, mut checksum) = data;
+            let (length, mut checksum, mtime) = data;
             info!("Finished beaming up {} ({} bytes)", file_name, length);
-            try!(scotty.file_beam_end(&file_id, None, Some(length), Some(checksum.result_str())));
+            try!(scotty.file_beam_end(&file_id, None, Some(length), Some(checksum.result_str()), mtime));
             try!(stream.write_u8(ServerMessages::FileBeamed as u8).map_err(map_byte_err));
             Ok(())
             },
         Err(why) => {
             info!("Error beaming up {}: {}", file_name, why);
-            try!(scotty.file_beam_end(&file_id, Some(&why), None, None));
+            try!(scotty.file_beam_end(&file_id, Some(&why), None, None, None));
             Err(why)
         }
     }
@@ -126,11 +159,19 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 
 fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty) -> TransporterResult<()>
 {
+    let mut protocol_version = ProtocolVersion::V1;
     loop {
         let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8().map_err(map_byte_err))));
         match message_code {
-            ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty)),
+            ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty, &protocol_version)),
             ClientMessages::BeamComplete => return Ok(()),
+            ClientMessages::ProtocolVersion => {
+                protocol_version = try!(
+                    stream.read_u16::<BigEndian>()
+                    .map_err(map_byte_err)
+                    .and_then(|c| ProtocolVersion::from_u16(c)));
+                info!("Client set the protocol version to {:?}", protocol_version);
+            }
             _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
     }

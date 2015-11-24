@@ -40,6 +40,7 @@ Options:
 ";
 
 type BeamId = usize;
+type Mtime = u64;
 
 fn run(config: &Config) {
     println!("Loaded configuration: {:?}", config);
