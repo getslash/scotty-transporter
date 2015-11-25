@@ -8,7 +8,7 @@ use std::error::Error;
 use std::fmt;
 use std::thread::sleep_ms;
 use rustc_serialize::json::{EncoderError, DecoderError, encode, decode};
-use super::BeamId;
+use super::{BeamId, Mtime};
 use std::io::Read;
 use std::io::Error as IoError;
 
@@ -38,6 +38,7 @@ struct FileUpdateRequest {
     success: bool,
     error: String,
     size: Option<usize>,
+    mtime: Option<Mtime>,
     checksum: Option<String>
 }
 
@@ -143,12 +144,12 @@ impl Scotty {
         Ok((file_params.file_id, file_params.storage_name, file_params.should_beam))
     }
 
-    pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>, file_size: Option<usize>, file_checksum: Option<String>) -> ScottyResult<()> {
+    pub fn file_beam_end(&mut self, file_id: &str, err: Option<&Error>, file_size: Option<usize>, file_checksum: Option<String>, mtime: Option<Mtime>) -> ScottyResult<()> {
         let error_string = match err {
             Some(err) => err.description(),
             _ => ""
         };
-        let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string(), size: file_size, checksum: file_checksum};
+        let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string(), size: file_size, checksum: file_checksum, mtime: mtime};
         let encoded_params = try!(encode::<FileUpdateRequest>(&params));
         try!(
             self.send_request(

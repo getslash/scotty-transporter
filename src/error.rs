@@ -8,6 +8,7 @@ use super::beam::ClientMessages;
 #[derive(Debug)]
 pub enum TransporterError {
     InvalidClientMessageCode(u8),
+    InvalidProtocolVersion(u16),
     UnexpectedClientMessageCode(ClientMessages),
     ScottyError(ScottyError),
     ClientEOF,
@@ -46,6 +47,7 @@ impl fmt::Display for TransporterError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
             TransporterError::InvalidClientMessageCode(code) => write!(f, "Invalid message code: {}", code),
+            TransporterError::InvalidProtocolVersion(code) => write!(f, "Invalid protocol version: {}", code),
             TransporterError::UnexpectedClientMessageCode(ref code) => write!(f, "Unexpected message code: {:?}", code),
             TransporterError::ScottyError(ref error) => write!(f, "Scotty error: {}", error),
             TransporterError::ClientEOF => write!(f, "Client close the connection in a middle of a beam"),
