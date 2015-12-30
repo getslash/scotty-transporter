@@ -2,7 +2,7 @@
 
 name = "transporter"
 version = "0.7.0"
-authors = ["Roey Darwish Dror <roeyd@infinidat.com>"]
+authors = ["Roey Darwish Dror <roey.ghost@gmail.com>"]
 
 [dependencies]
 byteorder = "*"
