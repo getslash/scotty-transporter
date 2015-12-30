@@ -1,6 +1,6 @@
 [root]
 name = "transporter"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt 0.6.78 (registry+https://github.com/rust-lang/crates.io-index)",
