@@ -3,7 +3,7 @@
   with_items:
     - ruby
     - ruby-dev
-    - gcc
+    - build-essential
 
 - name: install FPM
   shell: gem install fpm
