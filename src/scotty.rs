@@ -6,14 +6,15 @@ use hyper::status::StatusCode;
 use hyper::method::Method;
 use std::error::Error;
 use std::fmt;
-use std::thread::sleep_ms;
+use std::thread::sleep;
+use std::time::Duration;
 use rustc_serialize::json::{EncoderError, DecoderError, encode, decode};
 use super::{BeamId, Mtime};
 use std::io::Read;
 use std::io::Error as IoError;
 
-const TIME_TO_SLEEP : u32 = 5000;
-const MAX_ATTEMPTS : u32 = 60000 / TIME_TO_SLEEP * 1;
+const TIME_TO_SLEEP : u64 = 5;
+const MAX_ATTEMPTS : u64 = 60000 / TIME_TO_SLEEP * 1;
 
 pub struct Scotty {
     url: String,
@@ -127,7 +128,7 @@ impl Scotty {
                 },
                 StatusCode::BadGateway | StatusCode::GatewayTimeout => {
                     error!("Scotty returned {}. Attempt {} out of {}", response.status, attempt + 1, MAX_ATTEMPTS);
-                    sleep_ms(TIME_TO_SLEEP);
+                    sleep(Duration::from_secs(TIME_TO_SLEEP));
                 },
                 _ => { return Err(ScottyError::ScottyError(response.status, url)); }
             }
