@@ -3,7 +3,6 @@ use std::path::Path;
 use std::error::Error;
 use std::io::Error as IoError;
 use std::io::Read;
-use std::fmt;
 use rustc_serialize::json;
 
 #[derive(Debug, RustcDecodable, Clone)]
@@ -15,27 +14,16 @@ pub struct Config {
     pub log_level: String,
 }
 
-#[derive(Debug)]
-pub enum ConfigError {
-    IoError(IoError),
-    DecodeError(json::DecoderError)
-}
-
-impl Error for ConfigError {
-    fn description(&self) -> &str { "Config Error" }
-    fn cause(&self) -> Option<&Error> {
-        match *self {
-            ConfigError::IoError(ref e) => Some(e),
-            ConfigError::DecodeError(ref e) => Some(e),
+quick_error! {
+    #[derive(Debug)]
+    pub enum ConfigError {
+        IoError(err: IoError) {
+            from()
+            display("Configuration IO Error: {}", err)
         }
-    }
-}
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ConfigError::IoError(ref e) => formatter.write_fmt(format_args!("Configuration IO Error: {}", e)),
-            ConfigError::DecodeError(ref e) => formatter.write_fmt(format_args!("Configuration Decoding Error: {}", e)),
+        DecodeError(err: json::DecoderError) {
+            from()
+            display("Configuration Decoding Error: {}", err)
         }
     }
 }

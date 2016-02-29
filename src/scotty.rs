@@ -5,7 +5,6 @@ use hyper::error::Error as HttpError;
 use hyper::status::StatusCode;
 use hyper::method::Method;
 use std::error::Error;
-use std::fmt;
 use std::thread::sleep;
 use std::time::Duration;
 use rustc_serialize::json::{EncoderError, DecoderError, encode, decode};
@@ -60,56 +59,30 @@ impl<'a> BeamUpdateRequest<'a> {
     }
 }
 
-#[derive(Debug)]
-pub enum ScottyError {
-    EncoderError(EncoderError),
-    DecoderError(DecoderError),
-    HttpError(HttpError),
-    ScottyError(StatusCode, String),
-    ScottyIsDown,
-    IoError(IoError),
-}
-
-impl Error for ScottyError {
-    fn description(&self) -> &str { "Scotty Error" }
-    fn cause(&self) -> Option<&Error> {
-        match *self {
-            ScottyError::EncoderError(ref e) => Some(e),
-            ScottyError::DecoderError(ref e) => Some(e),
-            ScottyError::HttpError(ref e) => Some(e),
-            ScottyError::IoError(ref e) => Some(e),
-            _ => None
+quick_error! {
+    #[derive(Debug)]
+    pub enum ScottyError {
+        EncoderError(err: EncoderError) {
+            from()
+            display("Encoder Error: {}", err)
+        }
+        DecoderError(err: DecoderError) {
+            from()
+            display("Decoder Error: {}", err)
+        }
+        HttpError(err: HttpError) {
+            from()
+            display("HTTP Error: {}", err)
+        }
+        ScottyError(code: StatusCode, url: String) {
+            display("Scotty returned {} for {}", code, url)
+        }
+        ScottyIsDown {}
+        IoError(err: IoError) {
+            from()
+            display("IO Error: {}", err)
         }
     }
-}
-
-impl fmt::Display for ScottyError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ScottyError::EncoderError(ref e) => write!(f, "Encoder Error: {}", e),
-            ScottyError::DecoderError(ref e) => write!(f, "Deocder Error: {}", e),
-            ScottyError::HttpError(ref e) => write!(f, "Http Error: {}", e),
-            ScottyError::IoError(ref e) => write!(f, "IO Error: {}", e),
-            ScottyError::ScottyIsDown => write!(f, "Scotty is Down"),
-            ScottyError::ScottyError(code, ref url) => write!(f, "Scotty returned {} for {}", code, url)
-        }
-    }
-}
-
-impl From<HttpError> for ScottyError {
-    fn from(err: HttpError) -> ScottyError { ScottyError::HttpError(err) }
-}
-
-impl From<DecoderError> for ScottyError {
-    fn from(err: DecoderError) -> ScottyError { ScottyError::DecoderError(err) }
-}
-
-impl From<EncoderError> for ScottyError {
-    fn from(err: EncoderError) -> ScottyError { ScottyError::EncoderError(err) }
-}
-
-impl From<IoError> for ScottyError {
-    fn from(err: IoError) -> ScottyError { ScottyError::IoError(err) }
 }
 
 type ScottyResult<T> = Result<T, ScottyError>;

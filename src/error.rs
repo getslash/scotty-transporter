@@ -1,34 +1,32 @@
-use std::error::Error;
 use std::convert::From;
-use std::fmt;
 use std::io::Error as IoError;
 use super::scotty::ScottyError;
 use super::beam::ClientMessages;
 
-#[derive(Debug)]
-pub enum TransporterError {
-    InvalidClientMessageCode(u8),
-    InvalidProtocolVersion(u16),
-    UnexpectedClientMessageCode(ClientMessages),
-    ScottyError(ScottyError),
-    ClientEOF,
-    ClientIoError(IoError),
-    StorageIoError(IoError),
-}
-
-impl From<ScottyError> for TransporterError {
-    fn from(err: ScottyError) -> TransporterError { TransporterError::ScottyError(err) }
-}
-
-impl Error for TransporterError {
-    fn description(&self) -> &str {
-        return "";
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        match *self {
-            TransporterError::ScottyError(ref error) => Some(error),
-            _ => None
+quick_error! {
+    #[derive(Debug)]
+    pub enum TransporterError {
+        InvalidClientMessageCode(msg: u8) {
+            display("Invalid message code: {}", msg)
+        }
+        InvalidProtocolVersion(protocol: u16) {
+            display("Invalid protocol version: {}", protocol)
+        }
+        UnexpectedClientMessageCode(code: ClientMessages) {
+            display("Unexpected message code: {:?}", code)
+        }
+        ScottyError(err: ScottyError) {
+            from()
+            display("Scotty error: {}", err)
+        }
+        ClientEOF {
+            display("Client close the connection in a middle of a beam")
+        }
+        ClientIoError(err: IoError) {
+            display("Client IO error: {}", err)
+        }
+        StorageIoError(err: IoError) {
+            display("Storage IO error: {}", err)
         }
     }
 }
@@ -39,20 +37,6 @@ impl TransporterError {
             TransporterError::ClientIoError(_) => true,
             TransporterError::ClientEOF => true,
             _ => false
-        }
-    }
-}
-
-impl fmt::Display for TransporterError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            TransporterError::InvalidClientMessageCode(code) => write!(f, "Invalid message code: {}", code),
-            TransporterError::InvalidProtocolVersion(code) => write!(f, "Invalid protocol version: {}", code),
-            TransporterError::UnexpectedClientMessageCode(ref code) => write!(f, "Unexpected message code: {:?}", code),
-            TransporterError::ScottyError(ref error) => write!(f, "Scotty error: {}", error),
-            TransporterError::ClientEOF => write!(f, "Client close the connection in a middle of a beam"),
-            TransporterError::ClientIoError(ref error) => write!(f, "Client IO error: {}", error),
-            TransporterError::StorageIoError(ref error) => write!(f, "Storage IO error: {}", error),
         }
     }
 }

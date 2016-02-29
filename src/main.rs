@@ -12,6 +12,7 @@ extern crate byteorder;
 extern crate url;
 extern crate raven;
 #[macro_use] extern crate log;
+#[macro_use] extern crate quick_error;
 extern crate fern;
 extern crate time;
 extern crate crypto;

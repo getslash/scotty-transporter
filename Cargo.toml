@@ -14,6 +14,7 @@ url = "*"
 hyper = "*"
 time = "*"
 rust-crypto = "*"
+quick-error = "*"
 
 [dependencies.raven]
 git = "https://github.com/r-darwish/raven-rust.git"
