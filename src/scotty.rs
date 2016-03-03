@@ -85,7 +85,7 @@ quick_error! {
     }
 }
 
-type ScottyResult<T> = Result<T, ScottyError>;
+pub type ScottyResult<T> = Result<T, ScottyError>;
 
 impl Scotty {
     pub fn new(url: &String) -> Scotty{

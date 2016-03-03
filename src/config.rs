@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::path::Path;
-use std::error::Error;
 use std::io::Error as IoError;
 use std::io::Read;
 use rustc_serialize::json;
