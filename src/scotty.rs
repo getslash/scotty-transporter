@@ -102,12 +102,12 @@ impl Scotty {
                 let request = client.request(method.clone(), &url[..])
                     .body(json)
                     .header(ContentType(self.json_mime.clone()));
-                try!(request.send())
+                request.send()?
             };
 
             match response.status {
                 StatusCode::Ok => {
-                    try!(response.read_to_string(&mut content));
+                    response.read_to_string(&mut content)?;
                     return Ok(content);
                 },
                 StatusCode::BadGateway | StatusCode::GatewayTimeout => {
@@ -122,10 +122,9 @@ impl Scotty {
 
     pub fn file_beam_start(&mut self, beam_id: BeamId, file_name: &str) -> ScottyResult<(String, String, bool)> {
         let params = FilePostRequest { file_name: file_name.to_string(), beam_id: beam_id };
-        let encoded_params = try!(encode::<FilePostRequest>(&params));
-        let result = try!(
-            self.send_request(Method::Post, format!("{}/files", self.url), &encoded_params));
-        let file_params = try!(decode::<FilePostResponse>(&result));
+        let encoded_params = encode::<FilePostRequest>(&params)?;
+        let result = self.send_request(Method::Post, format!("{}/files", self.url), &encoded_params)?;
+        let file_params = decode::<FilePostResponse>(&result)?;
         Ok((file_params.file_id, file_params.storage_name, file_params.should_beam))
     }
 
@@ -135,20 +134,18 @@ impl Scotty {
             _ => ""
         };
         let params = FileUpdateRequest { success: err.is_none(), error: error_string.to_string(), size: file_size, checksum: file_checksum, mtime: mtime};
-        let encoded_params = try!(encode::<FileUpdateRequest>(&params));
-        try!(
-            self.send_request(
-                Method::Put,
-                format!("{}/files/{}", self.url, file_id),
-                &encoded_params));
+        let encoded_params = encode::<FileUpdateRequest>(&params)?;
+        self.send_request(
+            Method::Put,
+            format!("{}/files/{}", self.url, file_id),
+            &encoded_params)?;
         Ok(())
     }
 
     pub fn complete_beam(&mut self, beam_id: BeamId, error: Option<&str>) -> ScottyResult<()> {
         let params = BeamUpdateRequest::new(true, error);
-        let encoded_params = try!(encode::<BeamUpdateRequest>(&params));
-        try!(
-            self.send_request(Method::Put, format!("{}/beams/{}", self.url, beam_id), &encoded_params));
+        let encoded_params = encode::<BeamUpdateRequest>(&params)?;
+        self.send_request(Method::Put, format!("{}/beams/{}", self.url, beam_id), &encoded_params)?;
         Ok(())
     }
 }

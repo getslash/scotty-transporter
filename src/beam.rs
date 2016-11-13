@@ -67,47 +67,46 @@ enum ServerMessages {
 type FileData = (usize, Sha512, Option<Mtime>);
 
 fn read_file_name(stream: &mut TcpStream) -> TransporterResult<String> {
-    let file_name_length = try!(stream.read_u16::<BigEndian>().map_err(
-        |io| TransporterError::ClientIoError(io))) as usize;
+    let file_name_length = stream.read_u16::<BigEndian>().map_err(
+        |io| TransporterError::ClientIoError(io))? as usize;
     let mut file_name = String::new();
-    let file_name_length_read = try!(stream.take(file_name_length as u64).read_to_string(&mut file_name).map_err(
-        |io| TransporterError::ClientIoError(io)));
+    let file_name_length_read = stream.take(file_name_length as u64).read_to_string(&mut file_name).map_err(
+        |io| TransporterError::ClientIoError(io))?;
     assert_eq!(file_name_length_read, file_name_length);
     Ok(file_name)
 }
 
 fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str, protocol_version: &ProtocolVersion) -> TransporterResult<FileData> {
-    let mut file = try!(storage.create(file_id));
+    let mut file = storage.create(file_id)?;
     let mut checksum = Sha512::new();
     let mut length: usize = 0;
     let mut read_chunk = [0u8; CHUNK_SIZE];
 
     let mtime = if protocol_version.supports_mtime() {
-        Some(try!(stream.read_u64::<BigEndian>().map_err(|io| TransporterError::ClientIoError(io))))
+        Some(stream.read_u64::<BigEndian>().map_err(|io| TransporterError::ClientIoError(io))?)
     } else {
         None
     };
 
     loop {
-        let message_code = try!(stream.read_u8().map_err(|io| TransporterError::ClientIoError(io))
-            .and_then(|m| ClientMessages::from_u8(m)));
+        let message_code = stream.read_u8().map_err(|io| TransporterError::ClientIoError(io))
+            .and_then(|m| ClientMessages::from_u8(m))?;
         match message_code {
             ClientMessages::FileChunk => (),
             ClientMessages::FileDone => return Ok((length, checksum, mtime)),
             _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
         }
 
-        let chunk_size = try!(stream.read_u32::<BigEndian>().map_err(|io| TransporterError::ClientIoError(io)));
+        let chunk_size = stream.read_u32::<BigEndian>().map_err(|io| TransporterError::ClientIoError(io))?;
         let mut bytes_remaining = chunk_size as usize;
         while bytes_remaining > 0 {
             let to_read = min(bytes_remaining, read_chunk.len());
-            let bytes_read = try!(
-                stream.read(&mut read_chunk[0..to_read]).map_err(|io| TransporterError::ClientIoError(io)));
+            let bytes_read = stream.read(&mut read_chunk[0..to_read]).map_err(|io| TransporterError::ClientIoError(io))?;
             if bytes_read == 0 {
                 return Err(TransporterError::ClientEOF);
             }
             checksum.input(&read_chunk[0..bytes_read]);
-            try!(file.write_all(&mut read_chunk[0..bytes_read]).map_err(|io| TransporterError::StorageIoError(io)));
+            file.write_all(&mut read_chunk[0..bytes_read]).map_err(|io| TransporterError::StorageIoError(io))?;
             bytes_remaining -= bytes_read;
             length += bytes_read;
         }
@@ -117,20 +116,20 @@ fn download(stream: &mut TcpStream, storage: &FileStorage, file_id: &str, protoc
 fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scotty: &mut Scotty,
              protocol_version: &ProtocolVersion) -> TransporterResult<()> {
     debug!("{}: Got a request to beam up file", beam_id);
-    let file_name = try!(read_file_name(stream));
+    let file_name = read_file_name(stream)?;
     debug!("{}: File name is {}", beam_id, file_name);
 
-    let (file_id, storage_name, should_beam) = try!(scotty.file_beam_start(beam_id, &file_name));
+    let (file_id, storage_name, should_beam) = scotty.file_beam_start(beam_id, &file_name)?;
     debug!("{}: ID of {} is {}.", beam_id, file_name, file_id);
 
     if !should_beam {
         debug!("{}: Notifying the client that we should'nt beam {}.", beam_id, file_id);
-        try!(stream.write_u8(ServerMessages::SkipFile as u8).map_err(|io| TransporterError::ClientIoError(io)));
+        stream.write_u8(ServerMessages::SkipFile as u8).map_err(|io| TransporterError::ClientIoError(io))?;
         return Ok(());
     }
 
     debug!("{}: Notifying the client that we should beam {}.", beam_id, file_id);
-    try!(stream.write_u8(ServerMessages::BeamFile as u8).map_err(|io| TransporterError::ClientIoError(io)));
+    stream.write_u8(ServerMessages::BeamFile as u8).map_err(|io| TransporterError::ClientIoError(io))?;
 
     info!("{}: Beaming up {} to {}", beam_id, file_name, storage_name);
 
@@ -138,13 +137,13 @@ fn beam_file(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
         Ok(data) => {
             let (length, mut checksum, mtime) = data;
             info!("Finished beaming up {} ({} bytes)", file_name, length);
-            try!(scotty.file_beam_end(&file_id, None, Some(length), Some(checksum.result_str()), mtime));
-            try!(stream.write_u8(ServerMessages::FileBeamed as u8).map_err(|io| TransporterError::ClientIoError(io)));
+            scotty.file_beam_end(&file_id, None, Some(length), Some(checksum.result_str()), mtime)?;
+            stream.write_u8(ServerMessages::FileBeamed as u8).map_err(|io| TransporterError::ClientIoError(io))?;
             Ok(())
             },
         Err(why) => {
             info!("Error beaming up {}: {}", file_name, why);
-            try!(scotty.file_beam_end(&file_id, Some(&why), None, None, None));
+            scotty.file_beam_end(&file_id, Some(&why), None, None, None)?;
             Err(why)
         }
     }
@@ -154,15 +153,14 @@ fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 {
     let mut protocol_version = ProtocolVersion::V1;
     loop {
-        let message_code = try!(ClientMessages::from_u8(try!(stream.read_u8().map_err(|io| TransporterError::ClientIoError(io)))));
+        let message_code = ClientMessages::from_u8(stream.read_u8().map_err(|io| TransporterError::ClientIoError(io))?)?;
         match message_code {
-            ClientMessages::StartBeamingFile => try!(beam_file(beam_id, stream, storage, scotty, &protocol_version)),
+            ClientMessages::StartBeamingFile => beam_file(beam_id, stream, storage, scotty, &protocol_version)?,
             ClientMessages::BeamComplete => return Ok(()),
             ClientMessages::ProtocolVersion => {
-                protocol_version = try!(
-                    stream.read_u16::<BigEndian>()
+                protocol_version = stream.read_u16::<BigEndian>()
                     .map_err(|io| TransporterError::ClientIoError(io))
-                    .and_then(|c| ProtocolVersion::from_u16(c)));
+                    .and_then(|c| ProtocolVersion::from_u16(c))?;
                 info!("Client set the protocol version to {:?}", protocol_version);
             }
             _ => return Err(TransporterError::UnexpectedClientMessageCode(message_code)),
@@ -171,7 +169,7 @@ fn beam_loop(beam_id: usize, stream: &mut TcpStream, storage: &FileStorage, scot
 }
 
 pub fn beam_up(mut stream: TcpStream, storage: FileStorage, config: Config, error_tags: &mut Vec<(String, String)>) -> TransporterResult<()> {
-    let beam_id = try!(stream.read_u64::<BigEndian>().map_err(|io| TransporterError::ClientIoError(io))) as usize;
+    let beam_id = stream.read_u64::<BigEndian>().map_err(|io| TransporterError::ClientIoError(io))? as usize;
     error_tags.push((format!("beam_id"), format!("{}", beam_id)));
     let mut scotty = Scotty::new(&config.scotty_url);
     info!("Received beam up request with beam id {}", beam_id);
@@ -179,13 +177,13 @@ pub fn beam_up(mut stream: TcpStream, storage: FileStorage, config: Config, erro
     match beam_loop(beam_id, &mut stream, &storage, &mut scotty) {
         Ok(_) => {
             info!("Beam up completed");
-            try!(scotty.complete_beam(beam_id, None));
+            scotty.complete_beam(beam_id, None)?;
             Ok(())
         },
         Err(why) => {
             error!("Beam up failed: {}", why);
             let error = format!("Transporter Error: {}", why);
-            try!(scotty.complete_beam(beam_id, Some(&error)));
+            scotty.complete_beam(beam_id, Some(&error))?;
             Err(why)
         }
     }
