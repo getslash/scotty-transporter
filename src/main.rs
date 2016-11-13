@@ -19,7 +19,6 @@ extern crate crypto;
 
 use storage::FileStorage;
 use config::Config;
-use std::env::args;
 use std::path::Path;
 use std::str::FromStr;
 use docopt::Docopt;
