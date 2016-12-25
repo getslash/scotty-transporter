@@ -15,6 +15,7 @@ hyper = "*"
 time = "*"
 rust-crypto = "*"
 quick-error = "*"
+regex = "*"
 
-[dependencies.raven]
-git = "https://github.com/r-darwish/raven-rust.git"
+[dependencies.sentry]
+git = "https://github.com/r-darwish/rust-sentry.git"

@@ -10,18 +10,21 @@ extern crate hyper;
 extern crate docopt;
 extern crate byteorder;
 extern crate url;
-extern crate raven;
+extern crate sentry;
 #[macro_use] extern crate log;
 #[macro_use] extern crate quick_error;
 extern crate fern;
 extern crate time;
 extern crate crypto;
+extern crate regex;
 
 use storage::FileStorage;
 use config::Config;
 use std::path::Path;
 use std::str::FromStr;
 use docopt::Docopt;
+use sentry::{SentryCredential, Sentry};
+use regex::Regex;
 
 #[derive(RustcDecodable, Debug)]
 struct Args {
@@ -42,16 +45,31 @@ Options:
 pub type BeamId = usize;
 pub type Mtime = u64;
 
-fn run(config: &Config) {
+fn run(config: Config) {
     println!("Loaded configuration: {:?}", config);
     let storage = match FileStorage::open(&config.storage_path) {
         Ok(s) => s,
         Err(why) => panic!("Cannot open storage: {}", why)
     };
 
-    let raven = raven::Client::from_string(&config.sentry_dsn).unwrap();
+    let sentry = {
+        let regex = Regex::new(
+            r"^(?P<protocol>.*?)://(?P<key>.*?):(?P<secret>.*?)@(?P<host>.*?)/(?P<path>.*/)?(?P<project_id>.*)$").unwrap();
 
-    match server::listen(config, &storage, &raven) {
+        regex.captures(&config.sentry_dsn)
+            .map(|captures|
+                 SentryCredential {
+                     key: From::from(captures.name("key").unwrap()),
+                     secret: From::from(captures.name("secret").unwrap()),
+                     host: From::from(captures.name("host").unwrap()),
+                     project_id: From::from(captures.name("project_id").unwrap()),
+                 })
+            .map(|credentials|
+                 Sentry::new("Transporter".to_string(), VERSION.to_string(), "".to_string(), credentials)
+            )
+    };
+
+    match server::listen(config, storage, sentry) {
         Err(why) => panic!("Server crashed: {}", why),
         _ => ()
     }
@@ -84,5 +102,5 @@ fn main() {
     };
 
     fern::init_global_logger(logger_config, log::LogLevelFilter::Trace).unwrap();
-    run(&config);
+    run(config);
 }
