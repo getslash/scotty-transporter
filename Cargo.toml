@@ -6,16 +6,14 @@ authors = ["Roey Darwish Dror <roey.ghost@gmail.com>"]
 
 [dependencies]
 byteorder = "*"
-docopt = "*"
-fern = "*"
-log = "*"
+docopt = "0.7.*"
+fern = "0.3.*"
+log = "0.3.*"
 rustc-serialize = "*"
 url = "*"
-hyper = "*"
+hyper = "0.10.*"
 time = "*"
 rust-crypto = "*"
 quick-error = "*"
 regex = "*"
-
-[dependencies.sentry]
-git = "https://github.com/r-darwish/rust-sentry.git"
+sentry = "0.3.0-beta"

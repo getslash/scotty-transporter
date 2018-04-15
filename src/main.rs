@@ -16,15 +16,12 @@ extern crate sentry;
 extern crate fern;
 extern crate time;
 extern crate crypto;
-extern crate regex;
 
 use storage::FileStorage;
 use config::Config;
 use std::path::Path;
 use std::str::FromStr;
 use docopt::Docopt;
-use sentry::{SentryCredential, Sentry};
-use regex::Regex;
 
 #[derive(RustcDecodable, Debug)]
 struct Args {
@@ -52,24 +49,9 @@ fn run(config: Config) {
         Err(why) => panic!("Cannot open storage: {}", why)
     };
 
-    let sentry = {
-        let regex = Regex::new(
-            r"^(?P<protocol>.*?)://(?P<key>.*?):(?P<secret>.*?)@(?P<host>.*?)/(?P<path>.*/)?(?P<project_id>.*)$").unwrap();
+    let _guard = sentry::init(config.sentry_dsn.clone());
 
-        regex.captures(&config.sentry_dsn)
-            .map(|captures|
-                 SentryCredential {
-                     key: From::from(captures.name("key").unwrap()),
-                     secret: From::from(captures.name("secret").unwrap()),
-                     host: From::from(captures.name("host").unwrap()),
-                     project_id: From::from(captures.name("project_id").unwrap()),
-                 })
-            .map(|credentials|
-                 Sentry::new("Transporter".to_string(), VERSION.to_string(), "".to_string(), credentials)
-            )
-    };
-
-    match server::listen(config, storage, sentry) {
+    match server::listen(config, storage) {
         Err(why) => panic!("Server crashed: {}", why),
         _ => ()
     }
