@@ -16,6 +16,7 @@ extern crate sentry;
 extern crate fern;
 extern crate time;
 extern crate crypto;
+extern crate openssl_probe;
 
 use storage::FileStorage;
 use config::Config;
@@ -68,6 +69,8 @@ fn main() {
     }
 
     let config = Config::load(&Path::new(&args.arg_config)).unwrap();
+
+    openssl_probe::init_ssl_cert_env_vars();
 
     let log_level = log::LogLevelFilter::from_str(&config.log_level).unwrap();
     let mut output = vec![];

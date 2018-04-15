@@ -1,14 +1,13 @@
-FROM archlinux/base AS build
+FROM ekidd/rust-musl-builder AS build
 
-RUN pacman -Sy --noconfirm --needed rust openssl-1.0 gcc
-WORKDIR /usr/src/myapp
+WORKDIR /home/rust/src
 COPY . .
 
-RUN OPENSSL_INCLUDE_DIR=/usr/include/openssl-1.0 OPENSSL_LIB_DIR=/usr/lib/openssl-1.0 cargo build --release
+RUN cargo build --release
 
-FROM archlinux/base
+FROM alpine
 
-RUN pacman -Sy --noconfirm --needed openssl-1.0
-COPY --from=build /usr/src/myapp/target/release/transporter /usr/local/bin/transporter
+COPY --from=build /home/rust/src/target/x86_64-unknown-linux-musl/release/transporter /usr/local/bin/transporter
+RUN transporter --version
 
 CMD ["transporter"]
