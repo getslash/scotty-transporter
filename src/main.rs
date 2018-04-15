@@ -6,7 +6,7 @@ mod error;
 mod scotty;
 
 extern crate rustc_serialize;
-extern crate hyper;
+extern crate reqwest;
 extern crate docopt;
 extern crate byteorder;
 extern crate url;
