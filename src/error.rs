@@ -36,7 +36,7 @@ impl TransporterError {
         match *self {
             TransporterError::ClientIoError(_) => true,
             TransporterError::ClientEOF => true,
-            _ => false
+            _ => false,
         }
     }
 }

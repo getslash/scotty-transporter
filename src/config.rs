@@ -30,10 +30,10 @@ quick_error! {
 impl Config {
     pub fn load(path: &Path) -> Result<Config, ConfigError> {
         let mut raw_json = String::new();
-        let _ = File::open(path).map_err(|e| ConfigError::IoError(e))?
+        let _ = File::open(path)
+            .map_err(|e| ConfigError::IoError(e))?
             .read_to_string(&mut raw_json);
-        let json = json::decode::<Config>(&raw_json)
-            .map_err(|e| ConfigError::DecodeError(e))?;
+        let json = json::decode::<Config>(&raw_json).map_err(|e| ConfigError::DecodeError(e))?;
         Ok(json)
     }
 }

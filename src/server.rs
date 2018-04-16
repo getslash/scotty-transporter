@@ -1,6 +1,6 @@
 extern crate sentry;
 
-use std::net::{TcpListener};
+use std::net::TcpListener;
 use std::thread;
 use std::io::Result;
 use sentry::protocol::{Event, Map};
@@ -11,7 +11,7 @@ use super::storage::FileStorage;
 pub fn listen(config: Config, storage: FileStorage) -> Result<()> {
     let listener = match TcpListener::bind(&config.bind_address[..]) {
         Ok(l) => l,
-        Err(why) => panic!("Server bind error: {}", why)
+        Err(why) => panic!("Server bind error: {}", why),
     };
 
     debug!("Debug messages are on");
@@ -49,11 +49,11 @@ pub fn listen(config: Config, storage: FileStorage) -> Result<()> {
                             }
 
                             error!("Connection closed: {}", why);
-                        },
+                        }
                         Ok(_) => (),
                     };
                 });
-            },
+            }
             _ => (),
         }
     }
