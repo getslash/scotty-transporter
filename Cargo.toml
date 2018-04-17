@@ -6,7 +6,7 @@ authors = ["Roey Darwish Dror <roey.ghost@gmail.com>"]
 
 [dependencies]
 byteorder = "*"
-docopt = "0.7.*"
+clap = "*"
 fern = "0.3.*"
 log = "0.3.*"
 rustc-serialize = "*"

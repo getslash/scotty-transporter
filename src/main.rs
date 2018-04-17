@@ -6,8 +6,8 @@ mod error;
 mod scotty;
 
 extern crate byteorder;
+extern crate clap;
 extern crate crypto;
-extern crate docopt;
 extern crate fern;
 #[macro_use]
 extern crate log;
@@ -24,23 +24,9 @@ use storage::FileStorage;
 use config::Config;
 use std::path::Path;
 use std::str::FromStr;
-use docopt::Docopt;
-
-#[derive(RustcDecodable, Debug)]
-struct Args {
-    arg_config: String,
-    flag_version: bool,
-}
+use clap::{App, Arg};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-static USAGE: &'static str = "
-Usage:
-    transporter <config>
-    transporter --version
-
-Options:
-    --version   Print the version.
-";
 
 pub type BeamId = usize;
 pub type Mtime = u64;
@@ -61,16 +47,18 @@ fn run(config: Config) {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
-        .unwrap_or_else(|e| e.exit());
+    let matches = App::new("Transporter")
+        .version(VERSION)
+        .about("Scotty's transporter server")
+        .arg(
+            Arg::with_name("config")
+                .help("Path to the configuration file")
+                .required(true)
+                .index(1),
+        )
+        .get_matches();
 
-    if args.flag_version {
-        println!("Version {}", VERSION);
-        return;
-    }
-
-    let config = Config::load(&Path::new(&args.arg_config)).unwrap();
+    let config = Config::load(&Path::new(&matches.value_of("config").unwrap())).unwrap();
 
     openssl_probe::init_ssl_cert_env_vars();
 
