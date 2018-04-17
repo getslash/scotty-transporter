@@ -23,7 +23,6 @@ extern crate url;
 use storage::FileStorage;
 use config::Config;
 use std::path::Path;
-use std::str::FromStr;
 use clap::{App, Arg};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -62,22 +61,18 @@ fn main() {
 
     openssl_probe::init_ssl_cert_env_vars();
 
-    let log_level = log::LogLevelFilter::from_str(&config.log_level).unwrap();
-    let mut output = vec![];
-    output.push(fern::OutputConfig::stdout());
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] {}",
+                record.module_path().unwrap_or(""),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Trace)
+        .chain(std::io::stdout())
+        .apply()
+        .unwrap();;
 
-    let logger_config = fern::DispatchConfig {
-        format: Box::new(
-            |msg: &str, _: &log::LogLevel, location: &log::LogLocation| {
-                // This is a fairly simple format, though it's possible to do more complicated ones.
-                // This closure can contain any code, as long as it produces a String message.
-                format!("[{}] {}", location.module_path(), msg)
-            },
-        ),
-        output: output,
-        level: log_level,
-    };
-
-    fern::init_global_logger(logger_config, log::LogLevelFilter::Trace).unwrap();
     run(config);
 }
