@@ -2,9 +2,9 @@ use std::fs::File;
 use std::path::Path;
 use std::io::Error as IoError;
 use std::io::Read;
-use rustc_serialize::json;
+use serde_json;
 
-#[derive(Debug, RustcDecodable, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub storage_path: String,
     pub bind_address: String,
@@ -20,7 +20,7 @@ quick_error! {
             from()
             display("Configuration IO Error: {}", err)
         }
-        DecodeError(err: json::DecoderError) {
+        DecodeError(err: serde_json::Error) {
             from()
             display("Configuration Decoding Error: {}", err)
         }
@@ -33,7 +33,8 @@ impl Config {
         let _ = File::open(path)
             .map_err(|e| ConfigError::IoError(e))?
             .read_to_string(&mut raw_json);
-        let json = json::decode::<Config>(&raw_json).map_err(|e| ConfigError::DecodeError(e))?;
+        let json: Config =
+            serde_json::from_str(&raw_json).map_err(|e| ConfigError::DecodeError(e))?;
         Ok(json)
     }
 }
